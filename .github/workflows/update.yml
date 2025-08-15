@@ -11,19 +11,23 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
-      - name: Install deps
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          python -m pip install -r requirements.txt
 
-      - name: Configure env (optional filters)
+      # Optional: repo-level variables to narrow scope (safe if unset)
+      - name: Configure optional filters
         run: |
           echo "COVERAGE_STATES=${{ vars.COVERAGE_STATES }}" >> $GITHUB_ENV
           echo "COVERAGE_STATUS=${{ vars.COVERAGE_STATUS }}" >> $GITHUB_ENV
@@ -31,8 +35,9 @@ jobs:
           echo "COVERAGE_MAX_DOCS=${{ vars.COVERAGE_MAX_DOCS }}" >> $GITHUB_ENV
           echo "COVERAGE_TIMEOUT=${{ vars.COVERAGE_TIMEOUT }}" >> $GITHUB_ENV
 
-      - name: Run
-        run: python scripts/run_once.py
+      # ✅ Run as a module so 'from scripts.*' imports work
+      - name: Run dataset build
+        run: python -m scripts.run_once
 
       - name: Commit dataset if changed
         run: |
@@ -46,14 +51,28 @@ jobs:
             git push
           fi
 
-      - name: Release artifacts
+      # 📦 Bundle a stable buyer artifact (always the same filename)
+      - name: Bundle ZIP artifact
+        run: |
+          mkdir -p artifacts
+          zip -j artifacts/cms_lcd_lca_dataset_latest.zip dataset/*.csv
+
+      - name: Create Release with artifact
         uses: softprops/action-gh-release@v2
         with:
           tag_name: "run-${{ github.run_id }}-${{ github.run_number }}"
           name: "Dataset Update ${{ github.run_number }}"
+          body: |
+            Automated CMS LCD/LCA dataset update.
+
+            Includes:
+            - documents_latest.csv
+            - document_codes_latest.csv
+            - changes_YYYY-MM.csv
+
+            Stable artifact for buyers:
+            - cms_lcd_lca_dataset_latest.zip
           files: |
-            dataset/documents_latest.csv
-            dataset/document_codes_latest.csv
-            dataset/changes_*.csv
+            artifacts/cms_lcd_lca_dataset_latest.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
