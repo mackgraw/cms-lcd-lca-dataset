@@ -12,19 +12,18 @@ from scripts.coverage_api import (
     get_article_hcpc_codes, get_article_hcpc_modifiers,
     get_article_revenue_codes, get_article_bill_types,
 )
-
 from scripts.normalize import norm_doc_stub, norm_article_code_row
 from scripts.diff_changes import compute_code_changes
 
 ROOT = Path(__file__).resolve().parent.parent
-DATASET_DIR = ROOT / "dataset"
+DATASET_DIR = ROOT / "dataset"   # ⬅️ committed outputs live here
+DATA_DIR = ROOT / "data"         # ⬅️ last snapshot for diffs (can be ignored in .gitignore)
 ARTIFACTS_DIR = ROOT / "artifacts"
-DATA_DIR = ROOT / "data"
 
 def load_config():
     with open(ROOT / "config" / "config.yaml", "r", encoding="utf-8") as f:
         cfg = yaml.safe_load(f)
-    # Environment overrides
+    # Env overrides (optional)
     if os.getenv("COVERAGE_STATES"):
         cfg["states"] = [s.strip() for s in os.getenv("COVERAGE_STATES").split(",") if s.strip()]
     if os.getenv("COVERAGE_STATUS"):
@@ -47,9 +46,10 @@ def main():
     contractors = cfg.get("contractors") or None
     limit = int(cfg.get("max_docs_per_run", 250))
 
+    # Ensure folders exist
     DATASET_DIR.mkdir(parents=True, exist_ok=True)
-    ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+    ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
 
     # 1) Discover docs
     lcds = list_final_lcds(states, status, contractors)[:limit]
@@ -65,19 +65,19 @@ def main():
         if not aid:
             continue
         for row in get_article_icd10_covered(aid):
-            r = norm_article_code_row(aid, row); r["coverage_flag"]="covered"; r["code_system"]="ICD10-CM"; rows.append(r)
+            r = norm_article_code_row(aid, row); r["coverage_flag"] = "covered"; r["code_system"] = "ICD10-CM"; rows.append(r)
         for row in get_article_icd10_noncovered(aid):
-            r = norm_article_code_row(aid, row); r["coverage_flag"]="noncovered"; r["code_system"]="ICD10-CM"; rows.append(r)
+            r = norm_article_code_row(aid, row); r["coverage_flag"] = "noncovered"; r["code_system"] = "ICD10-CM"; rows.append(r)
         for row in get_article_hcpc_codes(aid):
-            r = norm_article_code_row(aid, row); r["code_system"]="HCPCS/CPT"; rows.append(r)
+            r = norm_article_code_row(aid, row); r["code_system"] = "HCPCS/CPT"; rows.append(r)
         for row in get_article_revenue_codes(aid):
-            r = norm_article_code_row(aid, row); r["code_system"]="Revenue"; rows.append(r)
+            r = norm_article_code_row(aid, row); r["code_system"] = "Revenue"; rows.append(r)
         for row in get_article_bill_types(aid):
-            r = norm_article_code_row(aid, row); r["code_system"]="Bill Type"; rows.append(r)
+            r = norm_article_code_row(aid, row); r["code_system"] = "Bill Type"; rows.append(r)
         for row in get_article_hcpc_modifiers(aid):
-            r = norm_article_code_row(aid, row); r["code_system"]="HCPCS Modifier"; rows.append(r)
+            r = norm_article_code_row(aid, row); r["code_system"] = "HCPCS Modifier"; rows.append(r)
 
-    codes_df = pd.DataFrame(rows).drop_duplicates(subset=["doc_id","code_system","code"]).reset_index(drop=True)
+    codes_df = pd.DataFrame(rows).drop_duplicates(subset=["doc_id", "code_system", "code"]).reset_index(drop=True)
 
     # 3) Diff vs previous snapshot (if any)
     prev_path = DATA_DIR / "document_codes_latest.csv"
@@ -87,19 +87,16 @@ def main():
     else:
         changes_df = pd.DataFrame(columns=["doc_id","code_system","code","change_type","prev_flag","curr_flag","change_date"])
 
-    # 4) Save
-    docs_out = DATASET_DIR / "documents_latest.csv"
-    codes_out = DATASET_DIR / "document_codes_latest.csv"
-    monthly_out = DATASET_DIR / f"changes_{datetime.utcnow().strftime('%Y-%m')}.csv"
+    # 4) Save committed outputs to /dataset and snapshot to /data
+    docs_df.to_csv(DATASET_DIR / "documents_latest.csv", index=False)
+    codes_df.to_csv(DATASET_DIR / "document_codes_latest.csv", index=False)
+    changes_df.to_csv(DATASET_DIR / f"changes_{datetime.utcnow().strftime('%Y-%m')}.csv", index=False)
 
-    docs_df.to_csv(docs_out, index=False)
-    codes_df.to_csv(codes_out, index=False)
-    changes_df.to_csv(monthly_out, index=False)
-
-    # persist snapshot for next diff
+    # Keep last snapshot only for diffs (not committed if .gitignore has /data)
     docs_df.to_csv(DATA_DIR / "documents_latest.csv", index=False)
     codes_df.to_csv(DATA_DIR / "document_codes_latest.csv", index=False)
 
+    # Summary print
     print({
         "run_time": now_et(),
         "docs": len(docs_df),
