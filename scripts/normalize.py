@@ -1,10 +1,11 @@
 from __future__ import annotations
 import hashlib
-
 def norm_doc_stub(stub: dict) -> dict:
+    doc_id = (stub.get("lcd_id") or stub.get("article_id") or
+              stub.get("id") or stub.get("document_id") or stub.get("doc_id"))
     return {
-        "doc_id": stub.get("lcd_id") or stub.get("article_id") or stub.get("id"),
-        "doc_type": "LCD" if ("lcd_id" in stub or stub.get("type") == "LCD") else "Article",
+        "doc_id": doc_id,
+        "doc_type": "LCD" if (stub.get("lcd_id") or str(doc_id).startswith("L")) else "Article",
         "title": stub.get("title") or stub.get("document_title") or "",
         "contractor": stub.get("contractor") or stub.get("contractor_name") or "",
         "jurisdiction": stub.get("jurisdiction") or stub.get("primary_jurisdiction") or "",

@@ -42,7 +42,7 @@ def now_et():
 def main():
     cfg = load_config()
     states = cfg.get("states") or None
-    status = cfg.get("status") or "Active"
+    status = cfg.get("status") or "all"   # <-- not "Active"
     contractors = cfg.get("contractors") or None
     limit = int(cfg.get("max_docs_per_run", 250))
 
@@ -61,7 +61,9 @@ def main():
     # 2) Pull codes from Articles
     rows = []
     for stub in arts:
-        aid = stub.get("article_id") or stub.get("id")
+        aid = (stub.get("article_id") or stub.get("id") or
+       stub.get("document_id") or stub.get("doc_id"))
+
         if not aid:
             continue
         for row in get_article_icd10_covered(aid):

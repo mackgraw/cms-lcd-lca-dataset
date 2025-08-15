@@ -24,33 +24,30 @@ def _get(path: str, params: Optional[Dict[str, str]] = None, timeout: int = 30) 
     r = requests.get(url, params=params or {}, timeout=timeout)
     r.raise_for_status()
     return r.json()
+# put near the top, under imports if you like
+def _status_code(status: str | None) -> str:
+    if not status:
+        return "all"
+    s = str(status).strip().lower()
+    return {"active": "A", "retired": "R", "future": "F", "future effective": "F"}.get(s, "all")
 
-def list_final_lcds(states: Optional[List[str]] = None,
-                    status: Optional[str] = "Active",
-                    contractors: Optional[List[str]] = None,
-                    timeout: int = 30) -> List[dict]:
-    # Reports endpoint uses different status param; to stay compatible,
-    # we simply DO NOT send a status filter here unless you later map to A/R/F.
-    params: Dict[str, str] = {}
-    if states:
-        params["state"] = ",".join(states)
-    if contractors:
-        params["contractor"] = ",".join(contractors)
-    # no 'status' param sent; avoids 400
+def list_final_lcds(states=None, status="all", contractors=None, timeout=30):
+    params = {}
+    if states:       params["state"] = ",".join(states)
+    if contractors:  params["contractor"] = ",".join(contractors)
+    sc = _status_code(status)
+    if sc != "all":
+        params["lcdStatus"] = sc          # ✅ correct param for LCD report
     data = _get("/v1/reports/local-coverage-final-lcds", params, timeout)
     return data if isinstance(data, list) else data.get("items", [])
 
-
-def list_articles(states: Optional[List[str]] = None,
-                  status: Optional[str] = "Active",
-                  contractors: Optional[List[str]] = None,
-                  timeout: int = 30) -> List[dict]:
-    params: Dict[str, str] = {}
-    if states:
-        params["state"] = ",".join(states)
-    if contractors:
-        params["contractor"] = ",".join(contractors)
-    # no 'status' param sent; avoids 400
+def list_articles(states=None, status="all", contractors=None, timeout=30):
+    params = {}
+    if states:       params["state"] = ",".join(states)
+    if contractors:  params["contractor"] = ",".join(contractors)
+    sc = _status_code(status)
+    if sc != "all":
+        params["articleStatus"] = sc      # ✅ correct param for Article report
     data = _get("/v1/reports/local-coverage-articles", params, timeout)
     return data if isinstance(data, list) else data.get("items", [])
 
