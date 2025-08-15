@@ -31,8 +31,9 @@ jobs:
           echo "COVERAGE_MAX_DOCS=${{ vars.COVERAGE_MAX_DOCS }}" >> $GITHUB_ENV
           echo "COVERAGE_TIMEOUT=${{ vars.COVERAGE_TIMEOUT }}" >> $GITHUB_ENV
 
-      - name: Run
-        run: python scripts/run_once.py
+      - name: Run update script
+        run: python -m scripts.run_once.py
+
 
       - name: Commit dataset if changed
         run: |
