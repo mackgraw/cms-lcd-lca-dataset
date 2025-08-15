@@ -1,0 +1,59 @@
+name: Update Dataset
+
+on:
+  schedule:
+    - cron: "5 11 * * *"  # 07:05 ET daily
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Configure env (optional filters)
+        run: |
+          echo "COVERAGE_STATES=${{ vars.COVERAGE_STATES }}" >> $GITHUB_ENV
+          echo "COVERAGE_STATUS=${{ vars.COVERAGE_STATUS }}" >> $GITHUB_ENV
+          echo "COVERAGE_CONTRACTORS=${{ vars.COVERAGE_CONTRACTORS }}" >> $GITHUB_ENV
+          echo "COVERAGE_MAX_DOCS=${{ vars.COVERAGE_MAX_DOCS }}" >> $GITHUB_ENV
+          echo "COVERAGE_TIMEOUT=${{ vars.COVERAGE_TIMEOUT }}" >> $GITHUB_ENV
+
+      - name: Run
+        run: python scripts/run_once.py
+
+      - name: Commit dataset if changed
+        run: |
+          git config user.name "dataset-bot"
+          git config user.email "dataset-bot@users.noreply.github.com"
+          git add dataset data || true
+          if git diff --cached --quiet; then
+            echo "No dataset changes."
+          else
+            git commit -m "Dataset update $(date -u +'%Y-%m-%d')"
+            git push
+          fi
+
+      - name: Release artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "run-${{ github.run_id }}-${{ github.run_number }}"
+          name: "Dataset Update ${{ github.run_number }}"
+          files: |
+            dataset/documents_latest.csv
+            dataset/document_codes_latest.csv
+            dataset/changes_*.csv
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
