@@ -3,15 +3,11 @@ from __future__ import annotations
 import csv
 import datetime as dt
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 from scripts.coverage_api import (
     list_final_lcds,
     list_articles,
-    get_lcd,
-    get_lcd_revision_history,
-    get_article,
-    get_article_revision_history,
     get_article_icd10_covered,
     get_article_icd10_noncovered,
     get_article_hcpc_codes,
@@ -19,9 +15,12 @@ from scripts.coverage_api import (
     get_article_revenue_codes,
     get_article_bill_types,
 )
+from scripts.normalize import norm_doc_row, norm_article_code_row
+from scripts.diff_changes import compute_code_changes
 
 # ---------- Paths ----------
-DATASET_DIR = Path(__file__).resolve().parent.parent / "dataset"
+ROOT = Path(__file__).resolve().parent.parent
+DATASET_DIR = ROOT / "dataset"
 DATASET_DIR.mkdir(parents=True, exist_ok=True)
 
 DOCS_FILE = DATASET_DIR / "documents_latest.csv"
@@ -29,34 +28,35 @@ CODES_FILE = DATASET_DIR / "document_codes_latest.csv"
 CHANGES_FILE = DATASET_DIR / f"changes_{dt.date.today().strftime('%Y-%m')}.csv"
 
 
-# ---------- Normalizers ----------
-def norm_doc_row(doc: Dict[str, Any]) -> Dict[str, Any]:
-    return {
-        "id": doc.get("lcd_id")
-        or doc.get("article_id")
-        or doc.get("articleId")
-        or doc.get("id")
-        or doc.get("document_id")
-        or doc.get("mcd_id"),
-        "type": doc.get("document_type") or doc.get("type") or "",
-        "title": doc.get("title") or doc.get("lcd_title") or doc.get("article_title") or "",
-        "contractor": doc.get("contractor") or doc.get("contractorName") or "",
-        "state": doc.get("state") or "",
-        "status": doc.get("lcdStatus") or doc.get("articleStatus") or doc.get("status") or "",
-    }
+def _article_id_from_stub(stub: Dict[str, Any]) -> str | None:
+    return (
+        stub.get("article_id")
+        or stub.get("articleId")
+        or stub.get("id")
+        or stub.get("document_id")
+        or stub.get("doc_id")
+        or stub.get("mcd_id")
+        or stub.get("mcdId")
+        or stub.get("articleNumber")
+    )
 
 
-def norm_article_code_row(article_id: str, row: Dict[str, Any]) -> Dict[str, Any]:
-    return {
-        "article_id": article_id,
-        "code": row.get("code") or row.get("Code") or "",
-        "description": row.get("description") or row.get("Description") or "",
-        "coverage_flag": row.get("coverage_flag") or "",
-        "code_system": row.get("code_system") or "",
-    }
+def _read_prev_codes(path: Path) -> List[Dict[str, str]]:
+    if not path.exists():
+        return []
+    rows: List[Dict[str, str]] = []
+    with open(path, newline="", encoding="utf-8") as f:
+        r = csv.DictReader(f)
+        for row in r:
+            rows.append({
+                "article_id": row.get("article_id", ""),
+                "code_system": row.get("code_system", ""),
+                "code": row.get("code", ""),
+                "coverage_flag": row.get("coverage_flag", ""),
+            })
+    return rows
 
 
-# ---------- Main ----------
 def main():
     run_time = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
 
@@ -66,28 +66,21 @@ def main():
     docs = lcds + arts
     print(f"[DEBUG] discovered {len(lcds)} LCDs, {len(arts)} Articles (total {len(docs)})")
 
-    # Save docs
+    # Save documents with source_url (via normalize.py)
     if docs:
+        # Establish header from first normalized row
+        sample = norm_doc_row(docs[0])
         with open(DOCS_FILE, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=list(norm_doc_row(docs[0]).keys()))
+            writer = csv.DictWriter(f, fieldnames=list(sample.keys()))
             writer.writeheader()
             for d in docs:
                 writer.writerow(norm_doc_row(d))
 
     # Step 2: Pull codes from Articles
-    rows = []
+    rows: List[Dict[str, str]] = []
     print(f"[DEBUG] articles discovered: {len(arts)}")
     for stub in arts:
-        aid = (
-            stub.get("article_id")
-            or stub.get("articleId")
-            or stub.get("id")
-            or stub.get("document_id")
-            or stub.get("doc_id")
-            or stub.get("mcd_id")
-            or stub.get("mcdId")
-            or stub.get("articleNumber")
-        )
+        aid = _article_id_from_stub(stub)
         if not aid:
             print(f"[WARN] Article stub without obvious id keys; keys={list(stub.keys())[:8]}")
             continue
@@ -119,18 +112,31 @@ def main():
             r["code_system"] = "HCPCS Modifier"
             rows.append(r)
 
+    # Write current codes
     if rows:
         with open(CODES_FILE, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
             writer.writeheader()
             for r in rows:
                 writer.writerow(r)
+    else:
+        # Ensure file exists even if empty (helps downstream)
+        with open(CODES_FILE, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=["article_id", "code", "description", "coverage_flag", "code_system"])
+            writer.writeheader()
 
-    # Step 3: Changes (currently placeholder: no diff logic yet)
+    # Step 3: Change tracking (compare with previous committed dataset if present)
+    prev_rows = _read_prev_codes(CODES_FILE)  # read BEFORE it was overwritten on prior commit (from last run)
+    # NOTE: In Actions, the repo is fresh each run and CODES_FILE reflects last committed dataset when we get here.
+    # After we write the new CODES_FILE above, prev_rows holds the "before" snapshot from last run.
+
+    changes = compute_code_changes(prev_rows=prev_rows, curr_rows=rows)
+
     with open(CHANGES_FILE, "w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow(["change_type", "id", "notes"])
-        # would be filled by diffing logic
+        writer = csv.DictWriter(f, fieldnames=["change_type", "article_id", "code_system", "code", "prev_flag", "curr_flag"])
+        writer.writeheader()
+        for ch in changes:
+            writer.writerow(ch)
 
     print(
         {
@@ -138,7 +144,7 @@ def main():
             "docs": len(docs),
             "articles": len(arts),
             "codes": len(rows),
-            "changes": 0,
+            "changes": len(changes),
         }
     )
 
