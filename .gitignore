@@ -7,3 +7,4 @@ artifacts/
 *.zip
 .DS_Store
 Thumbs.db
+$GITHUB_ENV
