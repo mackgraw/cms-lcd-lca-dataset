@@ -1,1 +1,501 @@
-
+doc_id,doc_type,title,contractor,jurisdiction,state,status,effective_date,last_updated,parent_lcd_id,source_url
+36668,Article,Urine Drug Testing,,,,,08/14/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=36668&ver=45
+36692,Article,Vitamin D Assay Testing,,,,,08/14/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=36692&ver=27
+37086,Article,Transcranial Magnetic Stimulation (TMS),,,,,08/14/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=37086&ver=27
+38773,Article,Facet Joint Interventions for Pain Management,,,,,08/14/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38773&ver=26
+36113,Article,MolDX: MGMT Promoter Methylation Analysis,,,,,08/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=36113&ver=24
+39469,Article,MolDX: Molecular Biomarker Testing to Guide Targeted Therapy Selection in Rheumatoid Arthritis,,,,,08/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39469&ver=8
+39467,Article,MolDX: Molecular Biomarker Testing to Guide Targeted Therapy Selection in Rheumatoid Arthritis,,,,,08/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39467&ver=8
+36192,Article,MolDX: MGMT Promoter Methylation Analysis,,,,,08/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=36192&ver=24
+36188,Article,MolDX: MGMT Promoter Methylation Analysis,,,,,08/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=36188&ver=25
+39481,Article,MolDX: Molecular Biomarker Testing to Guide Targeted Therapy Selection in Rheumatoid Arthritis,,,,,07/31/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39481&ver=8
+34200,Article,Removal of Benign Skin Lesions,,,,,08/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34200&ver=29
+34063,Article,RAST Type Tests,,,,,08/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34063&ver=18
+38920,Article,Off-label Use of Rituximab and Rituximab Biosimilars,,,,,08/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38920&ver=15
+38694,Article,Computed Tomography Cerebral Perfusion Analysis (CTP),,,,,08/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38694&ver=12
+35986,Article,Special Histochemical Stains and Immunohistochemical Stains,,,,,08/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=35986&ver=36
+33947,Article,Cardiac Computed Tomography (CCT) and Coronary Computed Tomography Angiography (CCTA),,,,,08/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=33947&ver=24
+37608,Article,MDS FISH,,,,,08/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=37608&ver=19
+33942,Article,Physical Therapy - Home Health,,,,,08/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=33942&ver=49
+34538,Article,Hospice Determining Terminal Status,,,,,08/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34538&ver=20
+33996,Article,Vitamin D Assay Testing,,,,,08/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=33996&ver=32
+34046,Article,Speech-Language Pathology,,,,,08/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34046&ver=29
+34061,Article,Scanning Computerized Ophthalmic Diagnostic Imaging (SCODI),,,,,08/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34061&ver=25
+34246,Article,Routine Foot Care and Debridement of Nails,,,,,08/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34246&ver=25
+36485,Article,MolDX: HLA-DQB1*06:02 Testing for Narcolepsy,,,,,08/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=36485&ver=22
+39427,Article,MolDX: Molecular Biomarker Testing to Guide Targeted Therapy Selection in Rheumatoid Arthritis,,,,,08/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39427&ver=6
+34562,Article,Home Health Skilled Nursing Care-Teaching and Training: Alzheimer's Disease and Behavioral Disturbances,,,,,08/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34562&ver=45
+38435,Article,MolDX: Pharmacogenomics Testing,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38435&ver=12
+38678,Article,MolDX: Phenotypic Biomarker Detection from Circulating Tumor Cells,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38678&ver=9
+36797,Article,MolDX: NRAS Genetic Testing,,,,,07/31/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=36797&ver=22
+38211,Article,Corneal Hysteresis,,,,,07/31/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38211&ver=15
+36400,Article,"MolDX: Genetic Testing for Hypercoagulability/Thrombophilia (Factor V Leiden, Factor II Prothrombin, and MTHFR)",,,,,07/31/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=36400&ver=20
+33398,Article,Transcranial Magnetic Stimulation,,,,,07/24/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=33398&ver=35
+39297,Article,Off-label Use of Rituximab and Rituximab Biosimilars,,,,,09/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39297&ver=6
+39314,Article,Off-Label Use of Intravenous Immune Globulin (IVIG),,,,,09/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39314&ver=11
+38367,Article,Fluid Jet System Treatment for LUTS/BPH,,,,,09/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38367&ver=31
+39940,Article,MolDX: Molecular Testing for Identification and Management of Hereditary Transthyretin Amyloidosis,,,,,08/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39940&ver=9
+39226,Article,Multiplex Gastrointestinal Pathogen Panel (GPP) Tests for Acute Gastroenteritis (AGE),,,,,06/12/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39226&ver=9
+38623,Article,Implantable Continuous Glucose Monitors (I-CGM),,,,,06/12/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38623&ver=17
+39770,Article,Cervical Fusion,,,,,01/30/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39770&ver=13
+38803,Article,Facet Joint Interventions for Pain Management,,,,,07/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38803&ver=16
+38801,Article,Facet Joint Interventions for Pain Management,,,,,07/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38801&ver=20
+35936,Article,Facet Joint Interventions for Pain Management,,,,,07/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=35936&ver=55
+38765,Article,Facet Joint Interventions for Pain Management,,,,,07/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38765&ver=23
+39071,Article,Platelet Rich Plasma,,,,,12/12/2021,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39071&ver=16
+39068,Article,Platelet Rich Plasma,,,,,12/12/2021,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39068&ver=21
+38671,Article,MolDX: Molecular Testing for Solid Organ Allograft Rejection,,,,,07/10/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38671&ver=6
+38629,Article,MolDX: Molecular Testing for Solid Organ Allograft Rejection,,,,,07/10/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38629&ver=5
+38026,Article,Corneal Hysteresis,,,,,07/10/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38026&ver=28
+34576,Article,Laparoscopic Sleeve Gastrectomy for Severe Obesity,,,,,07/10/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34576&ver=72
+34551,Article,One Day Stays for Chest Pain,,,,,07/10/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34551&ver=36
+38568,Article,MolDX: Molecular Testing for Solid Organ Allograft Rejection,,,,,07/10/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38568&ver=10
+37832,Article,MolDX: Breast Cancer Index® (BCI) Gene Expression Test,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=37832&ver=22
+39038,Article,MolDX: Molecular Syndromic Panels for Infectious Disease Pathogen Identification Testing,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39038&ver=13
+38997,Article,MolDX: Molecular Biomarkers to Risk-Stratify Patients at Increased Risk for Prostate Cancer,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38997&ver=11
+40022,Article,MolDX: Non-Next Generation Sequencing Tests for the Diagnosis of BCR-ABL Negative Myeloproliferative Neoplasms,,,,,08/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=40022&ver=3
+39927,Article,MolDX: Non-Next Generation Sequencing Tests for the Diagnosis of BCR-ABL Negative Myeloproliferative Neoplasms,,,,,08/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39927&ver=5
+39923,Article,MolDX: Non-Next Generation Sequencing Tests for the Diagnosis of BCR-ABL Negative Myeloproliferative Neoplasms,,,,,08/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39923&ver=6
+39919,Article,MolDX: Non-Next Generation Sequencing Tests for the Diagnosis of BCR-ABL Negative Myeloproliferative Neoplasms,,,,,08/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39919&ver=5
+39948,Article,MolDX: Molecular Testing for Identification and Management of Hereditary Transthyretin Amyloidosis,,,,,08/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39948&ver=6
+39950,Article,MolDX: Molecular Testing for Identification and Management of Hereditary Transthyretin Amyloidosis,,,,,08/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39950&ver=6
+39946,Article,MolDX: Genetic Testing for Heritable Thoracic Aortic Disease,,,,,08/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39946&ver=7
+39944,Article,MolDX: Genetic Testing for Heritable Thoracic Aortic Disease,,,,,08/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39944&ver=6
+39003,Article,MolDX: Molecular Syndromic Panels for Infectious Disease Pathogen Identification Testing,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39003&ver=12
+39001,Article,MolDX: Molecular Syndromic Panels for Infectious Disease Pathogen Identification Testing,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39001&ver=13
+38649,Article,MolDX: Prognostic and Predictive Molecular Classifiers for Bladder Cancer,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38649&ver=12
+38647,Article,MolDX: Prognostic and Predictive Molecular Classifiers for Bladder Cancer,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38647&ver=11
+38337,Article,MolDX: Pharmacogenomics Testing,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38337&ver=13
+38645,Article,MolDX: Phenotypic Biomarker Detection from Circulating Tumor Cells,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38645&ver=7
+38643,Article,MolDX: Phenotypic Biomarker Detection from Circulating Tumor Cells,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38643&ver=7
+39007,Article,MolDX: Molecular Biomarkers to Risk-Stratify Patients at Increased Risk for Prostate Cancer,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39007&ver=9
+39005,Article,MolDX: Molecular Biomarkers to Risk-Stratify Patients at Increased Risk for Prostate Cancer,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39005&ver=8
+38335,Article,MolDX: Pharmacogenomics Testing,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38335&ver=11
+40000,Article,MolDX: Non-Next Generation Sequencing Tests for the Diagnosis of BCR-ABL Negative Myeloproliferative Neoplasms,,,,,08/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=40000&ver=3
+37421,Article,Magnetic Resonance Image Guided High Intensity Focused Ultrasound (MRgFUS) for Tremor,,,,,08/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=37421&ver=32
+38582,Article,MolDX: Molecular Testing for Solid Organ Allograft Rejection,,,,,07/10/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38582&ver=10
+34011,Article,Ionized Calcium,,,,,10/01/2019,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34011&ver=18
+39989,Article,MolDX: Genetic Testing for Heritable Thoracic Aortic Disease,,,,,08/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39989&ver=4
+39987,Article,MolDX: Molecular Testing for Identification and Management of Hereditary Transthyretin Amyloidosis,,,,,08/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39987&ver=4
+39933,Article,MolDX: Genetic Testing for Heritable Thoracic Aortic Disease,,,,,08/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39933&ver=5
+39935,Article,MolDX: Molecular Testing for Identification and Management of Hereditary Transthyretin Amyloidosis,,,,,08/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39935&ver=8
+38985,Article,MolDX: Molecular Biomarkers to Risk-Stratify Patients at Increased Risk for Prostate Cancer,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38985&ver=17
+38988,Article,MolDX: Molecular Syndromic Panels for Infectious Disease Pathogen Identification Testing,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38988&ver=18
+39938,Article,MolDX: Genetic Testing for Heritable Thoracic Aortic Disease,,,,,08/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39938&ver=4
+38576,Article,MolDX: Prognostic and Predictive Molecular Classifiers for Bladder Cancer,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38576&ver=12
+38566,Article,MolDX: Phenotypic Biomarker Detection in Circulating Tumor Cells,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38566&ver=11
+38294,Article,MolDX: Pharmacogenomics Testing,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38294&ver=22
+38584,Article,MolDX: Phenotypic Biomarker Detection from Circulating Tumor Cells,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38584&ver=12
+38586,Article,MolDX: Prognostic and Predictive Molecular Classifiers for Bladder Cancer,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38586&ver=10
+38394,Article,MolDX: Pharmacogenomics Testing,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38394&ver=11
+38303,Article,MolDX: Prostate Cancer Genomic Classifier Assay for Men with Localized Disease,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38303&ver=12
+38341,Article,MolDX: Prostate Cancer Genomic Classifier Assay for Men with Localized Disease,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38341&ver=13
+38339,Article,MolDX: Prostate Cancer Genomic Classifier Assay for Men with Localized Disease,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38339&ver=16
+38292,Article,MolDX: Prostate Cancer Genomic Classifier Assay for Men with Localized Disease,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38292&ver=17
+38238,Article,MolDX: Predictive Classifiers for Early Stage Non-Small Cell Lung Cancer,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38238&ver=13
+37794,Article,MolDX: Breast Cancer Index® (BCI) Gene Expression Test,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=37794&ver=23
+37824,Article,MolDX: Breast Cancer Index® (BCI) Gene Expression Test,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=37824&ver=18
+37822,Article,MolDX: Breast Cancer Index® (BCI) Gene Expression Test,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=37822&ver=18
+38329,Article,MolDX: Predictive Classifiers for Early Stage Non-Small Cell Lung Cancer,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38329&ver=9
+38327,Article,MolDX: Predictive Classifiers for Early Stage Non-Small Cell Lung Cancer,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38327&ver=9
+38284,Article,MolDX: Predictive Classifiers for Early Stage Non-small Cell Lung Cancer,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38284&ver=12
+38016,Article,MolDX: Melanoma Risk Stratification Molecular Testing,,,,,06/26/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38016&ver=21
+37725,Article,MolDX: Melanoma Risk Stratification Molecular Testing,,,,,06/26/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=37725&ver=44
+33423,Article,Cardiac Computed Tomography & Angiography (CCTA),,,,,06/26/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=33423&ver=58
+37748,Article,MolDX: Melanoma Risk Stratification Molecular Testing,,,,,06/26/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=37748&ver=28
+37750,Article,MolDX: Melanoma Risk Stratification Molecular Testing,,,,,06/26/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=37750&ver=29
+38841,Article,Facet Joint Interventions for Pain Management,,,,,06/26/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38841&ver=16
+34760,Article,Scanning Computerized Ophthalmic Diagnostic Imaging (SCODI),,,,,06/26/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34760&ver=27
+35490,Article,Category III Codes,,,,,06/26/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=35490&ver=81
+36839,Article,Polysomnography and Other Sleep Studies,,,,,06/26/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=36839&ver=23
+39042,Article,MolDX: Molecular Biomarkers to Risk-Stratify Patients at Increased Risk for Prostate Cancer,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39042&ver=7
+38684,Article,MolDX: Prognostic and Predictive Molecular Classifiers for Bladder Cancer,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38684&ver=8
+34526,Article,Surgical Treatment of Obstructive Sleep Apnea (OSA),,,,,06/26/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34526&ver=24
+39044,Article,MolDX: Molecular Syndromic Panels for Infectious Disease Pathogen Identification Testing,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39044&ver=13
+38680,Article,MolDx: Molecular Testing for Solid Organ Allograft Rejection,,,,,07/10/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38680&ver=7
+35121,Article,Coronary Computed Tomography Angiography (CCTA),,,,,06/26/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=35121&ver=33
+38443,Article,MolDX: Predictive Classifiers for Early Stage Non-Small Cell Lung Cancer,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38443&ver=11
+38018,Article,MolDX: Melanoma Risk Stratification Molecular Testing,,,,,06/26/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38018&ver=18
+38433,Article,MolDX: Prostate Cancer Genomic Classifier Assay for Men with Localized Disease,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38433&ver=9
+39797,Article,Minimally Invasive Arthrodesis of the Sacroiliac Joint (SIJ),,,,,04/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39797&ver=13
+38278,Article,Non-Invasive Fractional Flow Reserve (FFR) for Ischemic Heart Disease,,,,,08/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38278&ver=35
+39658,Article,MolDX: Molecular Biomarkers for Risk Stratification of Indeterminate Pulmonary Nodules Following Bronchoscopy,,,,,06/19/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39658&ver=4
+37903,Article,"MolDX: Inivata™, InVisionFirst®, Liquid Biopsy for Patients with Lung Cancer",,,,,06/19/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=37903&ver=18
+35984,Article,"MolDX: Genetic Testing for Hypercoagulability / Thrombophilia (Factor V Leiden, Factor II Prothrombin, and MTHFR)",,,,,06/19/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=35984&ver=22
+34045,Article,Non-Invasive Vascular Studies,,,,,06/12/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34045&ver=37
+34171,Article,Nasal Punctum-Nasolacrimal Duct Dilation and Probing with or without Irrigation,,,,,06/05/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34171&ver=17
+34175,Article,Ophthalmic Angiography (Fluorescein and Indocyanine Green),,,,,06/05/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34175&ver=31
+34434,Article,Upper Gastrointestinal Endoscopy and Visualization,,,,,06/05/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34434&ver=68
+34040,Article,Polysomnography and Other Sleep Studies,,,,,07/20/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34040&ver=33
+36861,Article,Polysomnography and Other Sleep Studies,,,,,07/20/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=36861&ver=24
+34353,Article,Outpatient Psychiatry and Psychology Services,,,,,05/29/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34353&ver=32
+34049,Article,Outpatient Physical and Occupational Therapy Services,,,,,05/29/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34049&ver=35
+34399,Article,Ophthalmology: Posterior Segment Imaging (Extended Ophthalmoscopy and Fundus Photography),,,,,05/29/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34399&ver=29
+34181,Article,Ophthalmic Biometry for Intraocular Lens Power Calculation,,,,,05/29/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34181&ver=26
+33394,Article,"Drugs and Biologicals, Coverage of, for Label and Off-Label Uses",,,,,07/13/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=33394&ver=54
+39995,Article,Pharmacogenomic Testing,,,,,07/13/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39995&ver=5
+37606,Article,Genomic Sequence Analysis Panels in the Treatment of Hematolymphoid Diseases,,,,,07/13/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=37606&ver=17
+35000,Article,Molecular Pathology Procedures,,,,,07/13/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=35000&ver=149
+34633,Article,Erythropoiesis Stimulating Agents (ESAs),,,,,05/29/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34633&ver=54
+34594,Article,Nerve Conduction Studies and Electromyography,,,,,05/29/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34594&ver=42
+34615,Article,Visual Fields,,,,,05/29/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34615&ver=42
+36807,Article,MolDX: Molecular Diagnostic Tests (MDT),,,,,05/29/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=36807&ver=45
+38837,Article,Colon Capsule Endoscopy (CCE),,,,,05/29/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38837&ver=7
+33824,Article,Immunosuppressive Drugs,,,,,04/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=33824&ver=46
+38111,Article,MolDX: Pigmented Lesion Assay,,,,,05/22/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38111&ver=10
+39650,Article,MolDX: Molecular Testing for Risk Stratification of Thyroid Nodules,,,,,05/22/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39650&ver=6
+39585,Article,MolDX: Molecular Biomarker Testing for Risk Stratification of Cutaneous Squamous Cell Carcinoma,,,,,05/22/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39585&ver=4
+37130,Article,MolDX: DecisionDx-UM (Uveal Melanoma),,,,,05/22/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=37130&ver=21
+37905,Article,"MolDX: Envisia™, Veracyte™, Idiopathic Pulmonary Fibrosis Diagnostic Test",,,,,05/22/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=37905&ver=17
+36117,Article,MolDX: Genetic Testing for BCR-ABL Negative Myeloproliferative Disease,,,,,05/15/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=36117&ver=35
+39802,Article,Minimally Invasive Arthrodesis of the Sacroiliac Joint (SIJ),,,,,05/15/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39802&ver=8
+38659,Article,Implantable Continuous Glucose Monitors (I-CGM),,,,,02/25/2024,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38659&ver=13
+38657,Article,Implantable Continuous Glucose Monitors (I-CGM),,,,,02/25/2024,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38657&ver=17
+37851,Article,Biomarker Testing for Neuroendocrine Tumors/Neoplasms,,,,,02/10/2022,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=37851&ver=14
+34393,Article,Ocular Photography - External,,,,,05/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34393&ver=24
+35897,Article,Nerve Conduction Studies and Electromyography,,,,,05/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=35897&ver=31
+35249,Article,Nerve Blocks for Peripheral Neuropathy,,,,,05/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=35249&ver=19
+34195,Article,Mohs Micrographic Surgery,,,,,05/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34195&ver=27
+37356,Article,MolDX: EndoPredict Breast Cancer Gene Expression Test,,,,,05/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=37356&ver=16
+39367,Article,Genetic Testing in Oncology: Specific Tests,,,,,04/24/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39367&ver=41
+39365,Article,Genetic Testing in Oncology: Specific Tests,,,,,04/24/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39365&ver=149
+34864,Article,Loss-of-Heterozygosity Based Topographic Genotyping with PathfinderTG &reg;,,,,,11/14/2019,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34864&ver=43
+37663,Article,MolDX: EndoPredict® Breast Cancer Gene Expression Test,,,,,05/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=37663&ver=20
+36811,Article,MolDX: Breast Cancer Assay: Prosigna®,,,,,05/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=36811&ver=16
+37913,Article,MolDX: Breast Cancer Index® (BCI) Gene Expression Test,,,,,05/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=37913&ver=15
+39479,Article,MolDX: Molecular Assays for the Diagnosis of Cutaneous Melanoma,,,,,05/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39479&ver=5
+39529,Article,Intraarticular Knee Injections of Hyaluronan,,,,,05/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39529&ver=5
+39788,Article,Cervical Fusion,,,,,12/26/2024,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39788&ver=9
+38771,Article,Non-Invasive Fractional Flow Reserve (FFR) for Ischemic Heart Disease,,,,,04/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38771&ver=17
+36690,Article,"Wound Application of Cellular and/or Tissue Based Products (CTPs), Lower Extremities",,,,,09/05/2024,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=36690&ver=35
+35396,Article,Biomarkers for Oncology,,,,,04/24/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=35396&ver=220
+39025,Article,Minimally Invasive Surgical (MIS) Fusion of the Sacroiliac Joint (SIJ),,,,,05/02/2023,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39025&ver=6
+36494,Article,Minimally-Invasive Surgical (MIS) Fusion of the Sacroiliac (SI) Joint,,,,,01/04/2024,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=36494&ver=16
+33908,Article,High Sensitivity C-Reactive Protein (hsCRP),,,,,01/08/2019,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=33908&ver=21
+33969,Article,Diagnostic Aerosol or Vapor Inhalation,,,,,10/01/2019,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=33969&ver=16
+34856,Article,C-Reactive Protein High Sensitivity Testing (hsCRP),,,,,11/07/2019,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34856&ver=63
+35132,Article,Home Health Plans of Care: Monitoring Glucose Control in the Medicare Home Health Population with Type II Diabetes Mellitus,,,,,04/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=35132&ver=54
+34570,Article,Psychiatric Inpatient Hospitalization,,,,,04/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34570&ver=52
+38249,Article,MolDX: Blood Product Molecular Antigen Typing,,,,,04/10/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38249&ver=21
+37364,Article,Foodborne Gastrointestinal Panels Identified by Multiplex Nucleic Acid Amplification Tests (NAATs),,,,,03/27/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=37364&ver=25
+34539,Article,Psychological Services Coverage under the Incident to Provision for Physicians and Non-physicians,,,,,04/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34539&ver=15
+33317,Article,External Breast Prostheses,,,,,04/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=33317&ver=34
+34196,Article,Psychiatric Partial Hospitalization Programs,,,,,04/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34196&ver=29
+36267,Article,Bowel Management Devices,,,,,04/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=36267&ver=40
+34183,Article,Psychiatric Inpatient Hospitalization,,,,,04/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34183&ver=19
+34085,Article,Post-Void Residual Urine and/or Bladder Capacity by Ultrasound,,,,,04/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34085&ver=17
+33312,Article,Wheelchair Seating,,,,,04/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=33312&ver=37
+33792,Article,Wheelchair Options/Accessories,,,,,04/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=33792&ver=41
+33787,Article,Lower Limb Prostheses,,,,,04/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=33787&ver=35
+33686,Article,Ankle-Foot/Knee-Ankle-Foot Orthosis,,,,,04/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=33686&ver=41
+36763,Article,4Kscore® Assay,,,,,03/24/2022,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=36763&ver=30
+35906,Article,Somatosensory Testing,,,,,03/27/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=35906&ver=24
+34064,Article,Panretinal (Scatter) Laser Photocoagulation,,,,,03/27/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34064&ver=22
+39383,Article,Sacroiliac Joint Injections and Procedures,,,,,03/27/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39383&ver=11
+37578,Article,Micro-Invasive Glaucoma Surgery (MIGS),,,,,03/27/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=37578&ver=28
+35891,Article,Intravenous Immune Globulin,,,,,03/27/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=35891&ver=34
+34090,Article,Laser Ablation of the Prostate,,,,,03/27/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34090&ver=21
+36906,Article,GlycoMark® Testing for Glycemic Control,,,,,03/27/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=36906&ver=19
+38378,Article,Fluid Jet System in the Treatment of Benign Prostatic Hyperplasia (BPH),,,,,03/27/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38378&ver=22
+37228,Article,Wound Care,,,,,03/27/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=37228&ver=24
+38726,Article,Transurethral Waterjet Ablation of the Prostate,,,,,04/06/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38726&ver=17
+38712,Article,Transurethral Waterjet Ablation of the Prostate,,,,,04/06/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38712&ver=18
+37561,Article,Cystatin C Measurement,,,,,11/28/2019,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=37561&ver=20
+36715,Article,BRCA1 and BRCA2 Genetic Testing,,,,,12/10/2020,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=36715&ver=58
+36499,Article,BRCA1 and BRCA2 Genetic Testing,,,,,12/10/2020,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=36499&ver=28
+38396,Article,Cardiology Non-emergent Outpatient Stress Testing,,,,,04/25/2021,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38396&ver=25
+35083,Article,Cardiology Non-emergent Outpatient Stress Testing,,,,,04/25/2021,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=35083&ver=108
+33833,Article,Surgical Treatment of Nails,,,,,01/30/2022,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=33833&ver=26
+34887,Article,Surgical Treatment of Nails,,,,,01/30/2022,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34887&ver=53
+36593,Article,Polysomnography,,,,,03/20/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=36593&ver=37
+39799,Article,Cervical Fusion,,,,,08/11/2024,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39799&ver=16
+39793,Article,Cervical Fusion,,,,,08/11/2024,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39793&ver=47
+39276,Article,"MolDX: Molecular Testing for Detection of Upper Gastrointestinal Metaplasia, Dysplasia, and Neoplasia",,,,,03/13/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39276&ver=8
+39017,Article,MolDX: Lab-Developed Tests for Inherited Cancer Syndromes in Patients with Cancer,,,,,03/13/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39017&ver=9
+39684,Article,MolDX: Molecular Testing for Risk Stratification of Thyroid Nodules,,,,,03/13/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39684&ver=6
+39682,Article,MolDX: Molecular Testing for Risk Stratification of Thyroid Nodules,,,,,03/13/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39682&ver=7
+35922,Article,Lab: Special Histochemical Stains and Immunohistochemical Stains,,,,,03/13/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=35922&ver=44
+37581,Article,Lab: Cystatin C Measurement,,,,,03/13/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=37581&ver=24
+39851,Article,Artificial Intelligence Enabled CT Based Quantitative Coronary Topography (AI-QCT)/Coronary Plaque Analysis (AI-CPA),,,,,03/13/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39851&ver=15
+37313,Article,MolDX: Prometheus® IBD sgi Diagnostic® Policy,,,,,03/13/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=37313&ver=25
+37299,Article,MolDX: Prometheus® IBD sgi Diagnostic® Policy,,,,,03/13/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=37299&ver=29
+39264,Article,"MolDX: Molecular Testing for Detection of Upper Gastrointestinal Metaplasia, Dysplasia, and Neoplasia",,,,,03/13/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39264&ver=7
+39262,Article,"MolDX: Molecular Testing for Detection of Upper Gastrointestinal Metaplasia, Dysplasia, and Neoplasia",,,,,03/13/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39262&ver=7
+37260,Article,MolDX: Prometheus® IBD sgi Diagnostic® Policy,,,,,03/13/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=37260&ver=27
+39256,Article,"MolDX: Molecular Testing for Detection of Upper Gastrointestinal Metaplasia, Dysplasia, and Neoplasia",,,,,03/13/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39256&ver=7
+39646,Article,MolDX: Molecular Testing for Risk Stratification of Thyroid Nodules,,,,,03/13/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39646&ver=7
+39237,Article,Erythropoiesis Stimulating Agents,,,,,03/13/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39237&ver=10
+39258,Article,Surgical Treatment of Nails,,,,,03/13/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39258&ver=12
+38745,Article,Platelet Rich Plasma,,,,,03/13/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38745&ver=17
+38043,Article,MolDX: Plasma-Based Genomic Profiling in Solid Tumors,,,,,03/06/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38043&ver=14
+38268,Article,Immune Thrombocytopenia (ITP) Therapy,,,,,03/06/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38268&ver=10
+38307,Article,Hypoglossal Nerve Stimulation for the Treatment of Obstructive Sleep Apnea,,,,,03/06/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38307&ver=13
+34356,Article,Erythropoiesis Stimulating Agents (ESA),,,,,03/06/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34356&ver=30
+34081,Article,Endoscopy by Capsule,,,,,03/06/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34081&ver=25
+36029,Article,Urine Drug Testing,,,,,03/06/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=36029&ver=43
+39434,Article,Allogeneic Hematopoietic Cell Transplantation for Primary Refractory or Relapsed Hodgkin's and Non-Hodgkin's Lymphoma with B-cell or T-cell Origin,,,,,02/06/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39434&ver=6
+39232,Article,MolDX: Plasma-Based Genomic Profiling in Solid Tumors,,,,,03/06/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39232&ver=5
+39230,Article,MolDX: Plasma-Based Genomic Profiling in Solid Tumors,,,,,03/06/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39230&ver=6
+36902,Article,Polysomnography and Other Sleep Studies,,,,,02/27/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=36902&ver=15
+37575,Article,Frequency of Hemodialysis,,,,,02/27/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=37575&ver=21
+34037,Article,Flow Cytometry,,,,,02/27/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34037&ver=21
+39720,Article,MolDX: Molecular Testing for Risk Stratification of Thyroid Nodules,,,,,02/28/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39720&ver=5
+36805,Article,Lab: Special Histochemical Stains and Immunohistochemical Stains,,,,,02/28/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=36805&ver=25
+39913,Article,Artificial Intelligence Enabled CT Based Quantitative Coronary Topography (AI-QCT)/Coronary Plaque Analysis (AI-CPA),,,,,02/28/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39913&ver=7
+37539,Article,MolDX: Prometheus® IBD sgi Diagnostic® Policy,,,,,02/28/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=37539&ver=17
+39356,Article,"MolDX: Molecular Testing for Detection of Upper Gastrointestinal Metaplasia, Dysplasia, and Neoplasia",,,,,02/28/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39356&ver=5
+39911,Article,Total Joint Arthroplasty,,,,,02/28/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39911&ver=7
+35442,Article,MolDX: NRAS Genetic Testing,,,,,08/27/2024,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=35442&ver=25
+36951,Article,MolDX: Oncotype DX® Breast Cancer for DCIS (Genomic Health™),,,,,09/05/2024,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=36951&ver=19
+38168,Article,MolDX: Plasma-Based Genomic Profiling in Solid Tumors,,,,,03/06/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=38168&ver=11
+39958,Article,Intervertebral Disc Repair,,,,,04/13/2025,,,https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=39958&ver=4
+59636,Article,Billing and Coding: MolDX: Proteomics Testing,,,,,08/14/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59636&ver=24
+56853,Article,Billing and Coding: MolDX: Molecular Diagnostic Tests (MDT),,,,,08/14/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=56853&ver=92
+59642,Article,Billing and Coding: MolDX: Proteomics Testing,,,,,08/14/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59642&ver=24
+59641,Article,Billing and Coding: MolDX: Proteomics Testing,,,,,08/14/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59641&ver=24
+57527,Article,Billing and Coding: MolDX: Molecular Diagnostic Tests (MDT),,,,,08/14/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57527&ver=78
+57526,Article,Billing and Coding: MolDX: Molecular Diagnostic Tests (MDT),,,,,08/14/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57526&ver=82
+52370,Article,Billing and Coding: Bevacizumab and biosimilars,,,,,07/13/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=52370&ver=122
+57718,Article,Billing and Coding: Vitamin D Assay Testing,,,,,08/14/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57718&ver=20
+55001,Article,Billing and Coding: Urine Drug Testing,,,,,08/14/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=55001&ver=65
+57692,Article,Billing and Coding: Transcranial Magnetic Stimulation (TMS),,,,,08/14/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57692&ver=11
+59915,Article,Billing and Coding: Pharmacogenomic Testing,,,,,08/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59915&ver=14
+56793,Article,Billing and Coding: Genomic Sequence Analysis Panels in the Treatment of Hematolymphoid Diseases,,,,,08/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=56793&ver=34
+59529,Article,Billing and Coding: MolDX: Molecular Biomarker Testing to Guide Targeted Therapy Selection in Rheumatoid Arthritis,,,,,08/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59529&ver=10
+56881,Article,Billing and Coding: MolDX: HLA-DQB1*06:02 Testing for Narcolepsy,,,,,08/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=56881&ver=10
+57044,Article,Billing and Coding: Removal of Benign Skin Lesions,,,,,08/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57044&ver=16
+57043,Article,Billing and Coding: RAST Type Tests,,,,,08/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57043&ver=20
+58582,Article,Billing and Coding: Off-label Use of Rituximab and Rituximab Biosimilars,,,,,08/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=58582&ver=15
+56926,Article,Billing and Coding: MDS FISH,,,,,08/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=56926&ver=16
+52535,Article,Process for Determining Self-Administered Drug Exclusions – Medical Policy Article,,,,,08/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=52535&ver=13
+52470,Article,Billing and Coding: Venipuncture Necessitating Physician’s Skill for Specimen Collection – Supplemental Instructions Article,,,,,08/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=52470&ver=18
+56083,Article,Billing and Coding: Rezum® System for Benign Prostatic,,,,,08/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=56083&ver=13
+57311,Article,Billing and Coding: Physical Therapy - Home Health,,,,,08/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57311&ver=30
+56798,Article,Billing and Coding: Vitamin D Assay Testing,,,,,08/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=56798&ver=28
+57040,Article,Billing and Coding: Speech-Language Pathology,,,,,08/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57040&ver=25
+56692,Article,Billing and Coding: Scanning Computerized Ophthalmic Diagnostic Imaging (SCODI),,,,,08/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=56692&ver=16
+57193,Article,Billing and Coding: Routine Foot Care and Debridement of Nails,,,,,08/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57193&ver=22
+58456,Article,Billing and Coding: MolDX: Minimal Residual Disease Testing for Solid Tumor Cancers,,,,,07/31/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=58456&ver=30
+58454,Article,Billing and Coding: MolDX: Minimal Residual Disease Testing for Solid Tumor Cancers,,,,,07/31/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=58454&ver=33
+52399,Article,"Billing and Coding: Denosumab (Prolia®, Xgeva®, Jubbonti®, Wyost®)",,,,,07/31/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=52399&ver=57
+58207,Article,Billing and Coding: MolDX: Molecular Testing for Solid Organ Allograft Rejection,,,,,07/24/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=58207&ver=31
+58761,Article,Billing and Coding: MolDX: Molecular Syndromic Panels for Infectious Disease Pathogen Identification Testing,,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=58761&ver=57
+58774,Article,Billing and Coding: Cosmetic and Reconstructive Surgery,,,,,07/31/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=58774&ver=16
+56818,Article,Billing and Coding: Urine Drug Testing,,,,,07/24/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=56818&ver=49
+58741,Article,Billing and Coding: Respiratory Pathogen Panel Testing,,,,,07/31/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=58741&ver=17
+56900,Article,Billing and Coding: Immunizations,,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=56900&ver=21
+57936,Article,Billing and Coding: MolDX: Plasma-Based Genomic Profiling in Solid Tumors,,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57936&ver=33
+57100,Article,Billing and Coding: MolDX: Repeat Germline Testing,,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57100&ver=41
+57772,Article,Billing and Coding: MolDX: Molecular Diagnostic Tests (MDT),,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57772&ver=69
+58468,Article,Billing and Coding: MolDX: Minimal Residual Disease Testing for Solid Tumor Cancers,,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=58468&ver=27
+57593,Article,Billing and Coding: Non-Invasive Peripheral Arterial Vascular Studies,,,,,07/31/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57593&ver=14
+57591,Article,Billing and Coding: Non-Invasive Abdominal / Visceral Vascular Studies,,,,,07/31/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57591&ver=18
+58395,Article,Billing and Coding: MolDX: Pharmacogenomics Testing,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=58395&ver=35
+59649,Article,Billing and Coding: MolDX: Proteomics Testing,,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59649&ver=19
+58376,Article,Billing and Coding: MolDX: Minimal Residual Disease Testing for Solid Tumor Cancers,,,,,07/31/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=58376&ver=51
+58434,Article,Billing and Coding: MolDX: Minimal Residual Disease Testing for Solid Tumor Cancers,,,,,07/31/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=58434&ver=25
+58019,Article,Billing and Coding: MolDX: Molecular Testing for Solid Organ Allograft Rejection,,,,,07/24/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=58019&ver=42
+58170,Article,Billing and Coding: MolDX: Molecular Testing for Solid Organ Allograft Rejection,,,,,07/24/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=58170&ver=30
+58168,Article,Billing and Coding: MolDX: Molecular Testing for Solid Organ Allograft Rejection,,,,,07/24/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=58168&ver=30
+57864,Article,Billing and Coding: Micro-Invasive Glaucoma Surgery (MIGS),,,,,11/17/2024,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57864&ver=35
+59658,Article,Billing and Coding: Artificial Hearts and Percutaneous Endovascular Cardiac Assist Procedures and Devices,,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59658&ver=8
+57863,Article,Billing and Coding: Micro-Invasive Glaucoma Surgery (MIGS),,,,,11/17/2024,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57863&ver=36
+59657,Article,Billing and Coding: Artificial Hearts and Percutaneous Endovascular Cardiac Assist Procedures and Devices,,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59657&ver=8
+56910,Article,Billing and Coding: Corneal Hysteresis,,,,,07/31/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=56910&ver=9
+58963,Article,Billing and Coding: Multiplex Gastrointestinal Pathogen Panel (GPP) Tests for Acute Gastroenteritis (AGE),,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=58963&ver=10
+60253,Article,Response to Comments: Off-label Use of Rituximab and Rituximab Biosimilars,,,,,09/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=60253&ver=3
+59101,Article,Billing and Coding: Off-label Use of Rituximab and Rituximab Biosimilars,,,,,09/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59101&ver=23
+60252,Article,Response to Comments: Off-Label Use of Intravenous Immune Globulin (IVIG),,,,,09/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=60252&ver=3
+59105,Article,Billing and Coding: Off-Label Use of Intravenous Immune Globulin (IVIG),,,,,09/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59105&ver=26
+60254,Article,Response to Comments: Fluid Jet Treatment for LUTS/BPH,,,,,09/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=60254&ver=3
+56797,Article,Billing and Coding: Fluid Jet System Treatment for LUTs/BPH,,,,,09/07/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=56797&ver=14
+53019,Article,Polysomnography and Sleep Studies – Medical Policy Article,,,,,07/24/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=53019&ver=14
+56199,Article,Billing and Coding: Molecular Pathology Procedures,,,,,07/13/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=56199&ver=117
+57949,Article,Billing and Coding: Hypoglossal Nerve Stimulation for the Treatment of Obstructive Sleep Apnea,,,,,01/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57949&ver=20
+57948,Article,Billing and Coding: Hypoglossal Nerve Stimulation for the Treatment of Obstructive Sleep Apnea,,,,,01/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57948&ver=23
+58577,Article,Billing and Coding: Respiratory Pathogen Panel Testing,,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=58577&ver=31
+58575,Article,Billing and Coding: Respiratory Pathogen Panel Testing,,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=58575&ver=35
+57807,Article,Billing and Coding: Independent Diagnostic Testing Facility (IDTF),,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57807&ver=121
+53252,Article,Billing and Coding: Independent Diagnostic Testing Facility (IDTF),,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=53252&ver=234
+52571,Article,Self-Administered Drug Exclusion List:,,,,,08/31/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=52571&ver=133
+53127,Article,Self-Administered Drug Exclusion List:,,,,,08/31/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=53127&ver=184
+56747,Article,Billing and Coding: Magnetic Resonance Angiography (MRA),,,,,07/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=56747&ver=28
+52848,Article,Billing and Coding: Botulinum Toxins,,,,,07/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=52848&ver=38
+58918,Article,Billing and Coding: Molecular Pathology and Genetic Testing,,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=58918&ver=77
+58917,Article,Billing and Coding: Molecular Pathology and Genetic Testing,,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=58917&ver=83
+56638,Article,Billing and Coding: Gastrointestinal Pathogen (GIP) Panels Utilizing Multiplex Nucleic Acid Amplification Techniques (NAATs),,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=56638&ver=37
+56642,Article,Billing and Coding: Gastrointestinal Pathogen (GIP) Panels Utilizing Multiplex Nucleic Acid Amplification Techniques (NAATs),,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=56642&ver=47
+58975,Article,Billing and Coding: MolDX: Plasma-Based Genomic Profiling in Solid Tumors,,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=58975&ver=24
+58973,Article,Billing and Coding: MolDX: Plasma-Based Genomic Profiling in Solid Tumors,,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=58973&ver=24
+56748,Article,Billing and Coding: White Cell Colony Stimulating Factors,,,,,04/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=56748&ver=28
+57867,Article,Billing and Coding: MolDX: Plasma-Based Genomic Profiling in Solid Tumors,,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57867&ver=33
+53022,Article,Self-Administered Drug Exclusion List: Medical Policy Article,,,,,06/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=53022&ver=109
+58747,Article,Billing and Coding: MolDX: Molecular Syndromic Panels for Infectious Disease Pathogen Identification Testing,,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=58747&ver=54
+57141,Article,Billing and Coding: MolDX: Repeat Germline Testing,,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57141&ver=39
+60251,Article,Response to Comments: DL40022 MolDX: Non-Next Generation Sequencing Tests for the Diagnosis of BCR-ABL Negative Myeloproliferative Neoplasms,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=60251&ver=2
+59939,Article,Billing and Coding: MolDX: Non-Next Generation Sequencing Tests for the Diagnosis of BCR-ABL Negative Myeloproliferative Neoplasms,,,,,08/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59939&ver=3
+57056,Article,Billing and Coding: Aortography and Peripheral Angiography,,,,,05/19/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57056&ver=42
+56682,Article,Billing and Coding: Diagnostic Abdominal Aortography and Renal Angiography,,,,,05/19/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=56682&ver=46
+59837,Article,Billing and Coding: MolDX: Non-Next Generation Sequencing Tests for the Diagnosis of BCR-ABL Negative Myeloproliferative Neoplasms,,,,,08/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59837&ver=5
+59835,Article,Billing and Coding: MolDX: Non-Next Generation Sequencing Tests for the Diagnosis of BCR-ABL Negative Myeloproliferative Neoplasms,,,,,08/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59835&ver=5
+60228,Article,Response to Comments: MolDX: Non-Next Generation Sequencing Tests for the Diagnosis of BCR-ABL Negative Myeloproliferative Neoplasms,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=60228&ver=4
+60227,Article,Response to Comments: MolDX: Non-Next Generation Sequencing Tests for the Diagnosis of BCR-ABL Negative Myeloproliferative Neoplasms,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=60227&ver=4
+59827,Article,Billing and Coding: MolDX: Non-Next Generation Sequencing Tests for the Diagnosis of BCR-ABL Negative Myeloproliferative Neoplasms,,,,,08/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59827&ver=5
+60223,Article,Response to Comments: MolDX: Non-Next Generation Sequencing Tests for the Diagnosis of BCR-ABL Negative Myeloproliferative Neoplasms,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=60223&ver=4
+58710,Article,Billing and Coding: MolDX: Molecular Syndromic Panels for Infectious Disease Pathogen Identification Testing,,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=58710&ver=76
+58017,Article,Billing and Coding: MolDX: Repeat Germline Testing,,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=58017&ver=45
+58318,Article,Billing and Coding: MolDX: Pharmacogenomics Testing,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=58318&ver=58
+57384,Article,Billing and Coding: MolDX: Pharmacogenomics Testing,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57384&ver=43
+59874,Article,Billing and Coding: MolDX: Molecular Testing for Identification and Management of Hereditary Transthyretin Amyloidosis,,,,,08/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59874&ver=6
+59872,Article,Billing and Coding: MolDX: Molecular Testing for Identification and Management of Hereditary Transthyretin Amyloidosis,,,,,08/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59872&ver=6
+60202,Article,Response to Comments: MolDX: Molecular Testing for Identification and Management of Hereditary Transthyretin Amyloidosis,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=60202&ver=5
+60201,Article,Response to Comments: MolDX: Molecular Testing for Identification and Management of Hereditary Transthyretin Amyloidosis,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=60201&ver=8
+59870,Article,Billing and Coding: MolDX: Genetic Testing in Heritable Thoracic Aortic Disease,,,,,08/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59870&ver=5
+59868,Article,Billing and Coding: MolDX: Genetic Testing in Heritable Thoracic Aortic Disease,,,,,08/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59868&ver=5
+60207,Article,Response to Comments: MolDX: Genetic Testing for Heritable Thoracic Aortic Disease,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=60207&ver=4
+60206,Article,Response to Comments: MolDX: Genetic Testing for Heritable Thoracic Aortic Disease,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=60206&ver=4
+58726,Article,Billing and Coding: MolDX: Molecular Syndromic Panels for Infectious Disease Pathogen Identification Testing,,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=58726&ver=66
+58720,Article,Billing and Coding: MolDX: Molecular Syndromic Panels for Infectious Disease Pathogen Identification Testing,,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=58720&ver=68
+57332,Article,Billing and Coding: MolDX: Repeat Germline Testing,,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57332&ver=49
+57331,Article,Billing and Coding: MolDX: Repeat Germline Testing,,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57331&ver=50
+57385,Article,Billing and Coding: MolDX: Pharmacogenomics Testing,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57385&ver=39
+59919,Article,Billing and Coding: MolDX: Non-Next Generation Sequencing Tests for the Diagnosis of BCR-ABL Negative Myeloproliferative Neoplasms,,,,,08/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59919&ver=3
+60248,Article,Response to Comments: MolDX: Non-Next Generation Sequencing Tests for the Diagnosis of BCR-ABL Negative Myeloproliferative Neoplasms,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=60248&ver=2
+60159,Article,Response to Comments: Magnetic Resonance Image Guided High Intensity Focused Ultrasound (MRgFUS) for Tremor,,,,,08/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=60159&ver=4
+57435,Article,Billing and Coding: Magnetic Resonance Image Guided High Intensity Focused Ultrasound (MRgFUS) for Tremor,,,,,08/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57435&ver=22
+58061,Article,Billing and Coding: MolDX: Molecular Testing for Solid Organ Allograft Rejection,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=58061&ver=28
+57120,Article,Billing and Coding: Ionized Calcium,,,,,10/01/2023,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57120&ver=19
+57523,Article,Billing and Coding: MolDX: Immunohistochemistry (IHC) Indications for Breast Pathology,,,,,11/19/2020,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57523&ver=9
+57797,Article,Billing and Coding: MolDX: Immunohistochemistry (IHC) Indications for Breast Pathology,,,,,11/19/2020,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57797&ver=9
+58567,Article,Billing and Coding: Wound and Ulcer Care,,,,,01/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=58567&ver=28
+58565,Article,Billing and Coding: Wound and Ulcer Care,,,,,01/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=58565&ver=35
+57191,Article,"Billing and Coding: Blepharoplasty, Eyelid Surgery, and Brow Lift",,,,,01/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57191&ver=9
+57190,Article,"Billing and Coding: Blepharoplasty, Eyelid Surgery, and Brow Lift",,,,,01/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57190&ver=10
+54992,Article,Billing and Coding: Nerve Conduction Studies and Electromyography,,,,,01/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=54992&ver=39
+54969,Article,Billing and Coding: Nerve Conduction Studies and Electromyography,,,,,01/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=54969&ver=48
+53387,Article,Billing and Coding: Aflibercept (EYLEA®),,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=53387&ver=32
+59160,Article,Billing and Coding: Luteinizing Hormone-Releasing Hormone (LHRH) Analogs,,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59160&ver=12
+60220,Article,Response to Comments: MolDX: Genetic Testing for Heritable Thoracic Aortic Disease (DL39989),,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=60220&ver=3
+60219,Article,Response to Comments: MolDX: Molecular Testing for Identification and Management of Hereditary Transthyretin Amyloidosis,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=60219&ver=3
+59908,Article,Billing and Coding: MolDX: Genetic Testing in Heritable Thoracic Aortic Disease,,,,,08/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59908&ver=4
+53066,Article,Self-Administered Drug Exclusion List:,,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=53066&ver=92
+59906,Article,Billing and Coding: MolDX: Molecular Testing for Identification and Management of Hereditary Transthyretin Amyloidosis,,,,,08/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59906&ver=4
+60190,Article,Response to Comments: MolDX: Molecular Testing for Identification and Management of Hereditary Transthyretin Amyloidosis,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=60190&ver=5
+60197,Article,Response to Comments: MolDX: Genetic Testing for Heritable Thoracic Aortic Disease,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=60197&ver=4
+59847,Article,Billing and Coding: MolDX: Genetic Testing in Heritable Thoracic Aortic Disease,,,,,08/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59847&ver=5
+59849,Article,Billing and Coding: MolDX: Molecular Testing for Identification and Management of Hereditary Transthyretin Amyloidosis,,,,,08/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59849&ver=6
+59862,Article,Billing and Coding: MolDX: Molecular Testing for Identification and Management of Hereditary Transthyretin Amyloidosis,,,,,08/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59862&ver=6
+59860,Article,Billing and Coding: MolDX: Genetic Testing in Heritable Thoracic Aortic Disease,,,,,08/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59860&ver=4
+60199,Article,Response to Comments: MolDX: Genetic Testing for Heritable Thoracic Aortic Disease,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=60199&ver=4
+60191,Article,Response to Comments: MolDX: Molecular Testing for Identification and Management of Hereditary Transthyretin Amyloidosis,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=60191&ver=6
+58324,Article,Billing and Coding: MolDX: Pharmacogenomics Testing,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=58324&ver=33
+56973,Article,Billing and Coding: MolDX: Molecular Diagnostic Tests (MDT),,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=56973&ver=63
+59646,Article,Billing and Coding: MolDX: Proteomics Testing,,,,,07/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59646&ver=10
+55323,Article,Billing and Coding: Implantable Infusion Pumps for Chronic Pain,,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=55323&ver=49
+55239,Article,Billing and Coding: Implantable Infusion Pumps for Chronic Pain,,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=55239&ver=56
+54917,Article,"Investigational Device Exemptions (IDE) - IDE Documentation Requirements for Studies with an FDA Approval dated January 01, 2015, or later",,,,,10/01/2015,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=54917&ver=19
+54919,Article,"Investigational Device Exemptions (IDE) - IDE Documentation Requirements for Studies with an FDA Approval dated January 01, 2015, or later",,,,,10/01/2015,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=54919&ver=21
+54767,Article,Billing and Coding: Medicare Preventive Coverage for Certain Vaccines,,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=54767&ver=65
+55531,Article,Billing and Coding: Peripheral Nerve Stimulation,,,,,06/26/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=55531&ver=33
+55530,Article,Billing and Coding: Peripheral Nerve Stimulation,,,,,06/26/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=55530&ver=34
+56342,Article,Billing and Coding: Implantable Automatic Defibrillators,,,,,04/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=56342&ver=32
+57707,Article,Billing and Coding: Treatment of Varicose Veins of the Lower Extremities,,,,,01/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57707&ver=13
+55775,Article,Billing and Coding: Reporting a Non-Covered Test Performed in Preparation for a Non-Covered Procedure,,,,,10/01/2024,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=55775&ver=11
+56340,Article,Billing and Coding: Implantable Automatic Defibrillators,,,,,04/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=56340&ver=30
+57706,Article,Billing and Coding: Treatment of Varicose Veins of the Lower Extremities,,,,,01/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57706&ver=13
+55774,Article,Billing and Coding: Reporting a Non-Covered Test Performed in Preparation for a Non-Covered Procedure,,,,,10/01/2024,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=55774&ver=12
+55909,Article,Billing and Coding: Wound Care,,,,,06/26/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=55909&ver=41
+57554,Article,Billing and Coding: Immune Globulins,,,,,01/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57554&ver=34
+57575,Article,Billing and Coding: MolDX: HLA-DQB1*06:02 Testing for Narcolepsy,,,,,06/29/2023,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57575&ver=9
+56903,Article,Billing and Coding: Polysomnography and Other Sleep Studies,,,,,06/26/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=56903&ver=15
+56905,Article,Billing and Coding: Surgical Treatment of Obstructive Sleep Apnea (OSA),,,,,06/26/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=56905&ver=17
+53021,Article,Self-Administered Drug Exclusion List: Medical Policy Article,,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=53021&ver=126
+52451,Article,"Billing and Coding: Ranibizumab and biosimilars, Aflibercept, Aflibercept HD, Brolucizumab-dbll, Faricimab-svoa, PAVBLU™aflibercept-ayyh, AHZANTIVE®aflibercept-abzv. ENZEEVU™aflibercept-mrbb, and OPUVIZ™aflibercept-yszy",,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=52451&ver=72
+56916,Article,Billing and Coding: Scanning Computerized Ophthalmic Diagnostic Imaging (SCODI),,,,,06/26/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=56916&ver=29
+52800,Article,Self-Administered Drug Exclusion List: (SAD List),,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=52800&ver=92
+54799,Article,Billing and Coding: Urine Drug Testing,,,,,07/25/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=54799&ver=59
+53033,Article,Self-Administered Drug Exclusion List:,,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=53033&ver=126
+53032,Article,Self-Administered Drug Exclusion List:,,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=53032&ver=132
+59056,Article,Billing and Coding: Influenza Diagnostic Tests,,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59056&ver=10
+59055,Article,Billing and Coding: Influenza Diagnostic Tests,,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59055&ver=11
+52527,Article,Self-Administered Drug Exclusion List: and Biologicals Excluded from Coverage - Medical Policy Article,,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=52527&ver=84
+56124,Article,Billing and Coding: Billing Limitations for Pharmacies,,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=56124&ver=31
+56119,Article,Billing and Coding: Billing Limitations for Pharmacies,,,,,07/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=56119&ver=34
+58995,Article,Billing and Coding: Epidural Steroid Injections for Pain Management,,,,,11/15/2023,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=58995&ver=13
+58993,Article,Billing and Coding: Epidural Steroid Injections for Pain Management,,,,,11/15/2023,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=58993&ver=14
+53848,Article,NCD - Pharmacogenomic Testing for Warfarin Response,,,,,10/01/2015,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=53848&ver=3
+58828,Article,Billing and Coding: Treatment of Males with Low Testosterone,,,,,07/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=58828&ver=12
+60200,Article,Response to Comments: Non-Invasive Fractional Flow Reserve (FFR) for Ischemic Heart Disease,,,,,06/19/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=60200&ver=5
+58406,Article,Billing and Coding: Non-Invasive Fractional Flow Reserve (FFR) for Ischemic Heart Disease,,,,,08/03/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=58406&ver=24
+59482,Article,Billing and Coding: MolDX: Molecular Biomarkers for Risk Stratification of Indeterminate Pulmonary Nodules Following Bronchoscopy,,,,,06/19/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59482&ver=4
+56982,Article,"Billing and Coding: MolDX: Inivata™, InVisionFirst®, Liquid Biopsy for Patients with Lung Cancer",,,,,06/19/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=56982&ver=15
+56980,Article,"Billing and Coding: MolDX: Genetic Testing for Hypercoagulability / Thrombophilia (Factor V Leiden, Factor II Prothrombin, and MTHFR)",,,,,06/19/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=56980&ver=12
+52498,Article,Power Mobility Devices - Policy Article,,,,,05/16/2023,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=52498&ver=59
+54271,Article,Billing and Coding: MolDX: Immunohistochemistry (IHC) Indications for Breast Pathology,,,,,11/22/2023,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=54271&ver=19
+59292,Article,Billing and Coding: Lab: Immunohistochemistry (IHC) Indications for Breast Pathology,,,,,03/07/2024,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59292&ver=6
+54880,Article,Billing and Coding: Additional Claim Documentation Requirements for Not Otherwise Classified (NOC) Drugs and Biological Products with Specific FDA Label Indications,,,,,06/12/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=54880&ver=10
+54197,Article,Billing and Coding: MolDX: Progensa® PCA3 Assay Coverage Update,,,,,11/16/2023,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=54197&ver=20
+54200,Article,Billing and Coding: MolDX: therascreen® KRAS PCR Kit Guidelines,,,,,11/22/2023,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=54200&ver=17
+54199,Article,Billing and Coding: MolDX: Therascreen® EGFR RGQ PCR Kit Guidelines,,,,,11/22/2023,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=54199&ver=15
+54189,Article,Billing and Coding: MolDX: cobas® EGFR Mutation Test Guidelines,,,,,11/16/2023,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=54189&ver=14
+54244,Article,Billing and Coding: MolDX: ApoE Genotype,,,,,11/16/2023,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=54244&ver=17
+54185,Article,Billing and Coding: MolDX: Afirma™ Assay by Veracyte Update,,,,,11/16/2023,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=54185&ver=20
+54278,Article,Billing and Coding: MolDX: MECP2 Genetic Testing,,,,,11/22/2023,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=54278&ver=17
+54274,Article,Billing and Coding: MolDX: L1CAM Gene Sequencing Guidelines,,,,,11/22/2023,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=54274&ver=20
+54272,Article,Billing and Coding: MolDX: KIF6 Genotype,,,,,11/22/2023,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=54272&ver=15
+54242,Article,Billing and Coding: MolDX: 9p21 Genotype Test,,,,,11/16/2023,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=54242&ver=17
+57284,Article,Billing and Coding: Nasal Punctum-Nasolacrimal Duct Dilation and Probing with or without Irrigation,,,,,06/05/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57284&ver=13
+57069,Article,Billing and Coding: Ophthalmic Angiography (Fluorescein and Indocyanine Green),,,,,06/05/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57069&ver=14
+58377,Article,Response to Comments: Transurethral Waterjet Ablation of the Prostate,,,,,11/12/2020,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=58377&ver=7
+59417,Article,Response to Comments: Genetic Testing for Oncology,,,,,06/02/2023,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59417&ver=18
+57697,Article,Billing and Coding: Polysomnography and Other Sleep Studies,,,,,07/20/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57697&ver=14
+57698,Article,Billing and Coding: Polysomnography and Other Sleep Studies,,,,,07/20/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57698&ver=13
+60189,Article,Response to Comments: Polysomnography and Other Sleep Studies,,,,,07/20/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=60189&ver=3
+60188,Article,Response to Comments: Polysomnography and Other Sleep Studies,,,,,07/20/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=60188&ver=3
+57067,Article,Billing and Coding: Outpatient Physical and Occupational Therapy Services,,,,,05/29/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57067&ver=29
+57071,Article,Billing and Coding: Ophthalmology: Posterior Segment Imaging (Extended Ophthalmoscopy and Fundus Photography),,,,,05/29/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57071&ver=30
+57070,Article,Billing and Coding: Ophthalmic Biometry for Intraocular Lens Power Calculation,,,,,05/29/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57070&ver=15
+55426,Article,Standard Documentation Requirements for All Claims Submitted to DME MACs,,,,,01/01/2024,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=55426&ver=123
+57483,Article,Billing and Coding: Visual Fields,,,,,05/29/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57483&ver=25
+59983,Article,"Response to Comments: Drugs and Biologicals, Coverage of, for Label and Off-Label Uses",,,,,07/13/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59983&ver=4
+57478,Article,Billing and Coding: Nerve Conduction Studies and Electromyography,,,,,05/29/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57478&ver=37
+59982,Article,Response to Comments: Pharmacogenomic Testing,,,,,07/13/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59982&ver=4
+59984,Article,Response to Comments: Genomic Sequence Analysis Panels in the Treatment of Hematolymphoid Diseases,,,,,07/13/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59984&ver=3
+55951,Article,Billing and Coding: Endometrial Hyperplasia Treatment with Intrauterine Device (Hormone-Eluting),,,,,05/29/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=55951&ver=15
+59968,Article,Response to Comments: Molecular Pathology Procedures,,,,,07/13/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59968&ver=4
+52466,Article,Nebulizers - Policy Article,,,,,01/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=52466&ver=72
+58537,Article,Response to Comments: Transurethral Waterjet Ablation of the Prostate,,,,,11/12/2020,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=58537&ver=5
+59171,Article,Response to Comments: Genetic Testing for Oncology,,,,,06/02/2023,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59171&ver=12
+52509,Article,Intravenous Immune Globulin - Policy Article,,,,,01/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=52509&ver=61
+52507,Article,External Infusion Pumps - Policy Article,,,,,02/19/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=52507&ver=143
+52474,Article,Immunosuppressive Drugs - Policy Article,,,,,01/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=52474&ver=37
+57915,Article,Billing and Coding: MolDX: Pigmented Lesion Assay,,,,,05/22/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57915&ver=10
+59474,Article,Billing and Coding: MolDX: Molecular Testing for Risk Stratification of Thyroid Nodules,,,,,05/22/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59474&ver=4
+59618,Article,Billing and Coding: Skin Substitutes Grafts/Cellular and Tissue-Based Products for the Treatment of Diabetic Foot Ulcers and Venous Leg Ulcers,,,,,01/01/2026,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59618&ver=18
+57917,Article,Billing and Coding: MolDX: Plasma-Based Genomic Profiling in Solid Tumors,,,,,05/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57917&ver=29
+54926,Article,Billing and Coding: Single Chamber and Dual Chamber Permanent Cardiac Pacemakers,,,,,02/10/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=54926&ver=25
+54982,Article,Billing and Coding: Single Chamber and Dual Chamber Permanent Cardiac Pacemakers,,,,,02/10/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=54982&ver=28
+57065,Article,Billing and Coding: Outpatient Psychiatry and Psychology Services,,,,,04/17/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57065&ver=25
+57059,Article,Billing and Coding: Biomarker Testing for Neuroendocrine Tumors/Neoplasms,,,,,10/17/2019,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57059&ver=6
+56247,Article,Response to Comments: Biomarker Testing for Neuroendocrine Tumors LCD L37851,,,,,04/01/2019,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=56247&ver=10
+56997,Article,Billing and Coding: MolDX: EndoPredict Breast Cancer Gene Expression Test,,,,,05/08/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=56997&ver=18
+56836,Article,Billing and Coding: Mohs Micrographic Surgery,,,,,05/08/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=56836&ver=17
+57663,Article,Billing and Coding: Nerve Blocks for Peripheral Neuropathy,,,,,05/08/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57663&ver=13
+57307,Article,Billing and Coding: Nerve Conduction Studies and Electromyography,,,,,05/08/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57307&ver=33
+57068,Article,Billing and Coding: Ocular Photography - External,,,,,05/08/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57068&ver=14
+56346,Article,Billing and Coding: Removal of Benign and Malignant Skin Lesions,,,,,06/15/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=56346&ver=22
+56476,Article,Billing and Coding: Cardiac Radionuclide Imaging,,,,,04/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=56476&ver=34
+56852,Article,Billing and Coding: Laparoscopic Sleeve Gastrectomy for Severe Obesity,,,,,10/01/2024,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=56852&ver=20
+57567,Article,Billing and Coding: MolDX: EndoPredict® Breast Cancer Gene Expression Test,,,,,05/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57567&ver=14
+57560,Article,Billing and Coding: MolDX: Breast Cancer Assay: Prosigna®,,,,,05/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57560&ver=10
+56391,Article,Billing and Coding: Implantable Automatic Defibrillators,,,,,05/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=56391&ver=35
+56335,Article,Billing and Coding: MolDX: Breast Cancer Index® (BCI) Gene Expression Test,,,,,05/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=56335&ver=14
+52986,Article,Billing and Coding: Biomarkers for Oncology,,,,,04/24/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=52986&ver=242
+59004,Article,Billing and Coding: MolDX: Minimal Residual Disease Testing for Hematologic Cancers,,,,,04/24/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59004&ver=20
+59805,Article,Billing and Coding: Cataract Surgery,,,,,11/14/2024,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=59805&ver=18
+54923,Article,Billing and Coding: Bariatric Surgery for Treatment of Co-Morbidities Conditions Related to Morbid Obesity,,,,,10/01/2024,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=54923&ver=41
+57944,Article,Billing and Coding: Hypoglossal Nerve Stimulation for Treatment of Obstructive Sleep Apnea,,,,,01/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57944&ver=19
+56897,Article,Billing and Coding: Loss-of-Heterozygosity Based Topographic Genotyping with Pathfinder TG&reg;,,,,,11/14/2019,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=56897&ver=10
+56795,Article,Billing and Coding: Erythropoiesis Stimulating Agents (ESAs),,,,,04/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=56795&ver=34
+57858,Article,Billing and Coding: MolDX: Next-Generation Sequencing for Solid Tumors,,,,,04/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=57858&ver=29
+58213,Article,Billing and Coding: Implantable Continuous Glucose Monitors (I-CGM),,,,,04/01/2025,,,https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=58213&ver=16
