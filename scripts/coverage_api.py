@@ -12,6 +12,9 @@ BASE_URL = "https://api.coverage.cms.gov"
 ARTIFACTS_DIR = Path(__file__).resolve().parent.parent / "artifacts"
 ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
 
+# -------------------------
+# Status mapping for Reports
+# -------------------------
 def _status_code(status: str | None) -> str:
     if not status:
         return "all"
@@ -25,16 +28,56 @@ def _status_code(status: str | None) -> str:
         "": "all",
     }.get(s, "all")
 
-def _pick_list(data: Any) -> List[dict]:
-    if isinstance(data, list):
-        return data
-    if isinstance(data, dict):
-        for key in ("items", "data", "results", "rows"):
-            v = data.get(key)
+
+# -------------------------
+# Robust list extractor
+# -------------------------
+_PREFERRED_KEYS = (
+    # common
+    "items", "results", "rows", "records",
+    # CMS Coverage shapes
+    "data", "codes", "codeTable", "table", "icd10Covered", "icd10Noncovered",
+)
+
+def _pick_list(d: Any) -> List[dict]:
+    """
+    Return a list of dicts from common API shapes. Recurses into nested dicts,
+    so it works for {"meta":..., "data": {"items":[...]}} and similar.
+    """
+    # direct list
+    if isinstance(d, list):
+        # ensure list of dicts (sometimes it's list[str], which we still serialize)
+        return d  # type: ignore[return-value]
+
+    if not isinstance(d, dict):
+        return []
+
+    # try preferred keys (some may themselves be dicts)
+    for k in _PREFERRED_KEYS:
+        if k in d:
+            v = d[k]
             if isinstance(v, list):
-                return v
+                return v  # type: ignore[return-value]
+            if isinstance(v, dict):
+                out = _pick_list(v)
+                if out:
+                    return out
+
+    # fallback: search all dict values
+    for v in d.values():
+        if isinstance(v, list):
+            return v  # type: ignore[return-value]
+        if isinstance(v, dict):
+            out = _pick_list(v)
+            if out:
+                return out
+
     return []
 
+
+# -------------------------
+# HTTP with debug dumps
+# -------------------------
 @retry(stop=stop_after_attempt(4), wait=wait_exponential_jitter(initial=1, max=10))
 def _get(path: str, params: Optional[Dict[str, str]] = None, timeout: int = 30) -> Any:
     params = params or {}
@@ -48,7 +91,7 @@ def _get(path: str, params: Optional[Dict[str, str]] = None, timeout: int = 30) 
     except Exception:
         payload = {"_non_json_text": r.text}
 
-    # Write debug dump so we can inspect exact shapes from Actions artifacts
+    # Write debug dump for inspection in Actions artifacts
     try:
         safe = path.strip("/").replace("/", "_")
         dump_name = f"debug_{safe}.json"
@@ -66,11 +109,16 @@ def _get(path: str, params: Optional[Dict[str, str]] = None, timeout: int = 30) 
     r.raise_for_status()
     return payload
 
-# -------- Reports (discovery) --------
-def list_final_lcds(states: Optional[List[str]] = None,
-                    status: Optional[str] = "all",
-                    contractors: Optional[List[str]] = None,
-                    timeout: int = 30) -> List[dict]:
+
+# -------------------------
+# Reports (discovery)
+# -------------------------
+def list_final_lcds(
+    states: Optional[List[str]] = None,
+    status: Optional[str] = "all",
+    contractors: Optional[List[str]] = None,
+    timeout: int = 30,
+) -> List[dict]:
     params: Dict[str, str] = {}
     if states:
         params["state"] = ",".join(states)
@@ -78,14 +126,18 @@ def list_final_lcds(states: Optional[List[str]] = None,
         params["contractor"] = ",".join(contractors)
     sc = _status_code(status)
     if sc != "all":
-        params["lcdStatus"] = sc
+        params["lcdStatus"] = sc  # CORRECT param
+
     data = _get("/v1/reports/local-coverage-final-lcds", params, timeout)
     return _pick_list(data)
 
-def list_articles(states: Optional[List[str]] = None,
-                  status: Optional[str] = "all",
-                  contractors: Optional[List[str]] = None,
-                  timeout: int = 30) -> List[dict]:
+
+def list_articles(
+    states: Optional[List[str]] = None,
+    status: Optional[str] = "all",
+    contractors: Optional[List[str]] = None,
+    timeout: int = 30,
+) -> List[dict]:
     params: Dict[str, str] = {}
     if states:
         params["state"] = ",".join(states)
@@ -93,54 +145,71 @@ def list_articles(states: Optional[List[str]] = None,
         params["contractor"] = ",".join(contractors)
     sc = _status_code(status)
     if sc != "all":
-        params["articleStatus"] = sc
+        params["articleStatus"] = sc  # CORRECT param
+
     data = _get("/v1/reports/local-coverage-articles", params, timeout)
     return _pick_list(data)
 
-# -------- Document detail (LCD) --------
+
+# -------------------------
+# Document detail (LCD)
+# -------------------------
 def get_lcd(lcd_id: str, timeout: int = 30) -> dict:
     return _get("/v1/data/lcd", {"lcd_id": lcd_id, "lcdId": lcd_id}, timeout)
+
 
 def get_lcd_revision_history(lcd_id: str, timeout: int = 30) -> List[dict]:
     data = _get("/v1/data/lcd/revision-history", {"lcd_id": lcd_id, "lcdId": lcd_id}, timeout)
     return _pick_list(data)
 
-# -------- Document detail (Article) --------
-# NOTE: pass BOTH snake_case and camelCase param names to be safe.
+
+# -------------------------
+# Document detail (Article)
+# -------------------------
+# Pass BOTH snake_case and camelCase to be safe
 def get_article(article_id: str, timeout: int = 30) -> dict:
     return _get("/v1/data/article", {"article_id": article_id, "articleId": article_id}, timeout)
+
 
 def get_article_revision_history(article_id: str, timeout: int = 30) -> List[dict]:
     data = _get("/v1/data/article/revision-history", {"article_id": article_id, "articleId": article_id}, timeout)
     return _pick_list(data)
 
+
 def get_article_codes_table(article_id: str, timeout: int = 30) -> List[dict]:
     data = _get("/v1/data/article/code-table", {"article_id": article_id, "articleId": article_id}, timeout)
     return _pick_list(data)
+
 
 def get_article_icd10_covered(article_id: str, timeout: int = 30) -> List[dict]:
     data = _get("/v1/data/article/icd10-covered", {"article_id": article_id, "articleId": article_id}, timeout)
     return _pick_list(data)
 
+
 def get_article_icd10_noncovered(article_id: str, timeout: int = 30) -> List[dict]:
     data = _get("/v1/data/article/icd10-noncovered", {"article_id": article_id, "articleId": article_id}, timeout)
     return _pick_list(data)
+
 
 def get_article_hcpc_codes(article_id: str, timeout: int = 30) -> List[dict]:
     data = _get("/v1/data/article/hcpc-code", {"article_id": article_id, "articleId": article_id}, timeout)
     return _pick_list(data)
 
+
 def get_article_hcpc_modifiers(article_id: str, timeout: int = 30) -> List[dict]:
     data = _get("/v1/data/article/hcpc-modifier", {"article_id": article_id, "articleId": article_id}, timeout)
     return _pick_list(data)
+
 
 def get_article_revenue_codes(article_id: str, timeout: int = 30) -> List[dict]:
     data = _get("/v1/data/article/revenue-code", {"article_id": article_id, "articleId": article_id}, timeout)
     return _pick_list(data)
 
+
 def get_article_bill_types(article_id: str, timeout: int = 30) -> List[dict]:
     data = _get("/v1/data/article/bill-codes", {"article_id": article_id, "articleId": article_id}, timeout)
     return _pick_list(data)
+
 
 def get_update_period(timeout: int = 30) -> dict:
     return _get("/v1/metadata/update-period/", None, timeout)
