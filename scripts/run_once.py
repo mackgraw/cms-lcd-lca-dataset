@@ -1,188 +1,146 @@
+# scripts/run_once.py
 from __future__ import annotations
 
 import csv
 import os
-import datetime as dt
-from pathlib import Path
-from typing import Dict, Any, List, Optional
+import sys
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
 
 from scripts.coverage_api import (
+    _debug,
+    ensure_license_acceptance,   # <-- add this line
     list_final_lcds,
     list_articles,
-    get_article_icd10_covered,
-    get_article_icd10_noncovered,
-    get_article_hcpc_codes,
-    get_article_hcpc_modifiers,
-    get_article_revenue_codes,
-    get_article_bill_types,
-    get_article_codes_table,
+    get_codes_table_any,
+    get_icd10_covered_any,
+    get_icd10_noncovered_any,
+    get_hcpc_codes_any,
+    get_hcpc_modifiers_any,
+    get_revenue_codes_any,
+    get_bill_types_any,
 )
-from scripts.normalize import norm_doc_row, norm_article_code_row
-from scripts.diff_changes import compute_code_changes
-
-ROOT = Path(__file__).resolve().parent.parent
-DATASET_DIR = ROOT / "dataset"
-DATASET_DIR.mkdir(parents=True, exist_ok=True)
-
-DOCS_FILE = DATASET_DIR / "documents_latest.csv"
-CODES_FILE = DATASET_DIR / "document_codes_latest.csv"
-CHANGES_FILE = DATASET_DIR / f"changes_{dt.date.today().strftime('%Y-%m')}.csv"
 
 
-def _debug_env():
-    print("[PY-ENV] COVERAGE_STATES   =", os.getenv("COVERAGE_STATES"))
-    print("[PY-ENV] COVERAGE_STATUS   =", os.getenv("COVERAGE_STATUS"))
-    print("[PY-ENV] COVERAGE_CONTRACTORS =", os.getenv("COVERAGE_CONTRACTORS"))
-    print("[PY-ENV] COVERAGE_MAX_DOCS =", os.getenv("COVERAGE_MAX_DOCS"))
-    print("[PY-ENV] COVERAGE_TIMEOUT  =", os.getenv("COVERAGE_TIMEOUT"))
+OUT_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "dataset")
+OUT_CSV = os.path.join(OUT_DIR, "document_codes_latest.csv")
 
+def _env(name: str, default: str = "") -> str:
+    v = os.environ.get(name, "")
+    print(f"[PY-ENV] {name:<16}= {v}", flush=True)
+    return v or default
 
-def _parse_csv_list(val: Optional[str]) -> Optional[List[str]]:
-    if not val:
-        return None
-    parts = [p.strip() for p in val.split(",")]
-    parts = [p for p in parts if p]
-    return parts or None
+def _mk_ids(row: Mapping[str, Any]) -> Dict[str, Any]:
+    # reports rows contain id and display_id fields; title/name may vary
+    return {
+        "article_id": row.get("article_id"),
+        "document_id": row.get("id") or row.get("document_id"),
+        "document_display_id": row.get("display_id") or row.get("document_display_id"),
+    }
 
+def _mk_label(row: Mapping[str, Any]) -> str:
+    title = row.get("title") or row.get("name") or row.get("display_name") or ""
+    disp  = row.get("display_id") or row.get("document_display_id") or ""
+    rid   = row.get("article_id") or row.get("id") or row.get("document_id") or ""
+    return f"{title or '?'}  id={rid}  display={disp}"
 
-def _env_cfg():
-    states = _parse_csv_list((os.getenv("COVERAGE_STATES") or "").strip())
-    contractors = _parse_csv_list((os.getenv("COVERAGE_CONTRACTORS") or "").strip())
-    status = (os.getenv("COVERAGE_STATUS") or "all").strip()
-    try:
-        max_docs = int((os.getenv("COVERAGE_MAX_DOCS") or "0").strip())
-    except ValueError:
-        max_docs = 0
-    return states, status, contractors, max_docs
+def _collect_for_ids(ids: Mapping[str, Any], timeout: int) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
 
-
-def _article_id_from_stub(stub: Dict[str, Any]) -> str | None:
-    return (
-        stub.get("article_id")
-        or stub.get("articleId")
-        or stub.get("id")
-        or stub.get("document_id")
-        or stub.get("doc_id")
-        or stub.get("mcd_id")
-        or stub.get("mcdId")
-        or stub.get("articleNumber")
-    )
-
-
-def _read_prev_codes(path: Path) -> List[Dict[str, str]]:
-    if not path.exists():
-        return []
-    rows: List[Dict[str, str]] = []
-    with open(path, newline="", encoding="utf-8") as f:
-        r = csv.DictReader(f)
-        for row in r:
-            rows.append({
-                "article_id": row.get("article_id", ""),
-                "code_system": row.get("code_system", ""),
-                "code": row.get("code", ""),
-                "coverage_flag": row.get("coverage_flag", ""),
-            })
-    return rows
-
-
-def _append_rows(rows: List[Dict[str, str]], article_id: str, payload_rows: List[Dict[str, Any]], *, code_system: Optional[str] = None, coverage_flag: Optional[str] = None):
-    for row in payload_rows:
-        r = norm_article_code_row(article_id, row)
-        if code_system:
-            r["code_system"] = code_system
-        if coverage_flag:
-            r["coverage_flag"] = coverage_flag
-        rows.append(r)
-
-
-def main():
-    _debug_env()
-    run_time = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S ")
-
-    states, status, contractors, max_docs = _env_cfg()
-
-    # Discover
-    lcds = list_final_lcds(states=states, status=status, contractors=contractors)
-    arts = list_articles(states=states, status=status, contractors=contractors)
-    print(f"[DEBUG] discovered (pre-limit) LCDs={len(lcds)} Articles={len(arts)}")
-
-    # Enforce MAX immediately
-    if max_docs and max_docs > 0:
-        lcds = lcds[: max(1, max_docs // 2)]
-        arts = arts[: max_docs]
-    print(f"[DEBUG] discovered (post-limit) LCDs={len(lcds)} Articles={len(arts)}")
-
-    docs = lcds + arts
-
-    # Save docs
-    if docs:
-        sample = norm_doc_row(docs[0])
-        with open(DOCS_FILE, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=list(sample.keys()))
-            writer.writeheader()
-            for d in docs:
-                writer.writerow(norm_doc_row(d))
-
-    prev_rows = _read_prev_codes(CODES_FILE)
-
-    # Fetch codes
-    rows: List[Dict[str, str]] = []
-    print(f"[DEBUG] articles to process: {len(arts)}")
-
-    # quick sanity probe on the first article
-    if arts:
-        probe_id = _article_id_from_stub(arts[0])
-        if probe_id:
-            icd_c = get_article_icd10_covered(probe_id)
-            icd_n = get_article_icd10_noncovered(probe_id)
-            hcpc = get_article_hcpc_codes(probe_id)
-            rev = get_article_revenue_codes(probe_id)
-            bill = get_article_bill_types(probe_id)
-            mod = get_article_hcpc_modifiers(probe_id)
-            table = get_article_codes_table(probe_id)
-            print(f"[DEBUG] probe article {probe_id}: covered={len(icd_c)} noncovered={len(icd_n)} hcpc={len(hcpc)} rev={len(rev)} bill={len(bill)} mod={len(mod)} table={len(table)}")
-
-    for stub in arts:
-        aid = _article_id_from_stub(stub)
-        if not aid:
-            print(f"[WARN] Article stub missing id; keys={list(stub.keys())[:8]}")
-            continue
-
-        _append_rows(rows, aid, get_article_icd10_covered(aid),    code_system="ICD10-CM",  coverage_flag="covered")
-        _append_rows(rows, aid, get_article_icd10_noncovered(aid), code_system="ICD10-CM",  coverage_flag="noncovered")
-        _append_rows(rows, aid, get_article_hcpc_codes(aid),       code_system="HCPCS/CPT")
-        _append_rows(rows, aid, get_article_revenue_codes(aid),    code_system="Revenue")
-        _append_rows(rows, aid, get_article_bill_types(aid),       code_system="Bill Type")
-        _append_rows(rows, aid, get_article_hcpc_modifiers(aid),   code_system="HCPCS Modifier")
-
-        # code-table (catch-all)
-        table_rows = get_article_codes_table(aid)
-        for tr in table_rows:
-            r = norm_article_code_row(aid, tr)
-            if not r.get("code_system"):
-                r["code_system"] = tr.get("codeSystem") or tr.get("table") or tr.get("type") or ""
-            if not r.get("coverage_flag"):
-                r["coverage_flag"] = tr.get("coverageFlag") or tr.get("coverage") or ""
+    def tag_and_extend(endpoint: str, got: List[Dict[str, Any]]):
+        for r in got:
+            r = dict(r)
+            r["_endpoint"] = endpoint
             rows.append(r)
 
-    # Write codes
-    code_headers = ["article_id", "code", "description", "coverage_flag", "code_system"]
-    with open(CODES_FILE, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=code_headers)
-        writer.writeheader()
+    # Order: table, icd10 (covered/non), then hcpc/revenue/bill types
+    # Each function already handles LCD vs Article and swallows 400s safely.
+    tag_and_extend("code-table",         get_codes_table_any(ids, timeout))
+    tag_and_extend("icd10-covered",      get_icd10_covered_any(ids, timeout))
+    tag_and_extend("icd10-noncovered",   get_icd10_noncovered_any(ids, timeout))
+    tag_and_extend("hcpc-code",          get_hcpc_codes_any(ids, timeout))
+    tag_and_extend("hcpc-modifier",      get_hcpc_modifiers_any(ids, timeout))
+    tag_and_extend("revenue-code",       get_revenue_codes_any(ids, timeout))
+    tag_and_extend("bill-codes",         get_bill_types_any(ids, timeout))
+
+    return rows
+
+def _write_csv(rows: List[Dict[str, Any]]) -> None:
+    os.makedirs(OUT_DIR, exist_ok=True)
+    # Collect all keys to make a stable header
+    header: List[str] = []
+    seen = set()
+    for r in rows:
+        for k in r.keys():
+            if k not in seen:
+                seen.add(k)
+                header.append(k)
+    if not header:
+        header = ["_endpoint"]  # minimal header
+
+    with open(OUT_CSV, "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=header, extrasaction="ignore")
+        w.writeheader()
         for r in rows:
-            writer.writerow({k: r.get(k, "") for k in code_headers})
+            w.writerow(r)
 
-    # Changes
-    changes = compute_code_changes(prev_rows=prev_rows, curr_rows=rows)
-    with open(CHANGES_FILE, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=["change_type", "article_id", "code_system", "code", "prev_flag", "curr_flag"])
-        writer.writeheader()
-        for ch in changes:
-            writer.writerow(ch)
+def main() -> None:
+    # Read env
+    STATES      = _env("COVERAGE_STATES")
+    STATUS      = _env("COVERAGE_STATUS")
+    CONTRACTORS = _env("COVERAGE_CONTRACTORS")
+    MAX_DOCS    = int(_env("COVERAGE_MAX_DOCS") or "0")
+    TIMEOUT     = int(_env("COVERAGE_TIMEOUT")  or "30")
 
-    print({"run_time": run_time, "docs": len(docs), "articles": len(arts), "codes": len(rows), "changes": len(changes)})
+    try:
+        ensure_license_acceptance()
+    except NameError:
+        print("[WARN] ensure_license_acceptance() not available, skipping.")
 
+
+    # Discover
+    lcds = list_final_lcds(STATES, STATUS, CONTRACTORS, timeout=TIMEOUT)
+    arts = list_articles(STATES, STATUS, CONTRACTORS, timeout=TIMEOUT)
+    _debug(f"[DEBUG] discovered {len(lcds)} LCDs, {len(arts)} Articles (total {len(lcds)+len(arts)})")
+
+    # Prefer processing Articles first (LCD tables often 400 or empty)
+    work: List[Tuple[str, Dict[str, Any]]] = []
+    for a in arts:
+        work.append(("Article", a))
+    for l in lcds:
+        work.append(("LCD", l))
+
+    if MAX_DOCS and len(work) > MAX_DOCS:
+        work = work[:MAX_DOCS]
+
+    all_rows: List[Dict[str, Any]] = []
+    processed = 0
+    for idx, (kind, row) in enumerate(work, start=1):
+        label = _mk_label(row)
+        _debug(f"[DEBUG] [{kind} {idx}/{len(work)}] {label}")
+        ids = _mk_ids(row)
+
+        try:
+            got = _collect_for_ids(ids, TIMEOUT)
+        except Exception as e:
+            _debug(f"[DEBUG]   -> collect errored: {e} (continue)")
+            got = []
+
+        if got:
+            # add basic document metadata to each row
+            for r in got:
+                r["_document_display_id"] = ids.get("document_display_id")
+                r["_document_id"]        = ids.get("document_id")
+                r["_kind"]               = kind
+                r["_title"]              = row.get("title") or row.get("name") or ""
+            _debug(f"        -> aggregated rows: {len(got)}")
+            all_rows.extend(got)
+        else:
+            _debug(f"        -> aggregated rows: 0")
+        processed += 1
+
+    _write_csv(all_rows)
+    print(f"[SUMMARY] processed items: {processed}, total rows written: {len(all_rows)}")
+    print(f"[SUMMARY] CSV: {OUT_CSV}")
 
 if __name__ == "__main__":
     main()
