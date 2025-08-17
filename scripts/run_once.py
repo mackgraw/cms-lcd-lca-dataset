@@ -1,9 +1,19 @@
 from __future__ import annotations
 
 import csv
+import os
+
 import datetime as dt
 from pathlib import Path
 from typing import Dict, Any, List
+
+def _debug_env():
+    print("[PY-ENV] COVERAGE_STATES   =", os.getenv("COVERAGE_STATES"))
+    print("[PY-ENV] COVERAGE_STATUS   =", os.getenv("COVERAGE_STATUS"))
+    print("[PY-ENV] COVERAGE_CONTRACTORS =", os.getenv("COVERAGE_CONTRACTORS"))
+    print("[PY-ENV] COVERAGE_MAX_DOCS =", os.getenv("COVERAGE_MAX_DOCS"))
+    print("[PY-ENV] COVERAGE_TIMEOUT  =", os.getenv("COVERAGE_TIMEOUT"))
+
 
 from scripts.coverage_api import (
     list_final_lcds,
@@ -58,6 +68,7 @@ def _read_prev_codes(path: Path) -> List[Dict[str, str]]:
 
 
 def main():
+    _debug_env()  # <-- prints what Python actually sees
     run_time = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
 
     # Step 1: Discover documents
