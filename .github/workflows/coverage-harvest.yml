@@ -1,0 +1,45 @@
+name: CMS Coverage Harvest
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [ main ]
+  schedule:
+    - cron: "15 6 * * 1"   # Mondays at 06:15 UTC (optional)
+
+jobs:
+  harvest:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run harvest
+        env:
+          # Leave these blank for full run; your code auto-accepts license and handles 400s safely.
+          COVERAGE_MAX_DOCS: ""        # empty => run all
+          COVERAGE_STATUS: ""          # empty => no filter
+          COVERAGE_TIMEOUT: "30"
+        run: |
+          python -m scripts.run_once
+        shell: bash
+
+      - name: Upload artifacts (CSV + logs)
+        uses: actions/upload-artifact@v4
+        with:
+          name: cms-coverage-${{ github.sha }}
+          path: |
+            out/**
+            **/logs/**
+          if-no-files-found: warn

@@ -1,14 +1,12 @@
-# scripts/run_once.py
 from __future__ import annotations
 
 import csv
 import os
-import sys
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
 
 from scripts.coverage_api import (
     _debug,
-    ensure_license_acceptance,   # <-- add this line
+    ensure_license_acceptance,
     list_final_lcds,
     list_articles,
     get_codes_table_any,
@@ -20,9 +18,11 @@ from scripts.coverage_api import (
     get_bill_types_any,
 )
 
-
-OUT_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "dataset")
-OUT_CSV = os.path.join(OUT_DIR, "document_codes_latest.csv")
+# Output locations
+ROOT_DIR = os.path.dirname(os.path.dirname(__file__))
+OUT_DIR  = os.path.join(ROOT_DIR, "dataset")
+OUT_CSV_CODES   = os.path.join(OUT_DIR, "document_codes_latest.csv")
+OUT_CSV_NOCODE  = os.path.join(OUT_DIR, "document_nocodes_latest.csv")  # NEW
 
 def _env(name: str, default: str = "") -> str:
     v = os.environ.get(name, "")
@@ -30,7 +30,6 @@ def _env(name: str, default: str = "") -> str:
     return v or default
 
 def _mk_ids(row: Mapping[str, Any]) -> Dict[str, Any]:
-    # reports rows contain id and display_id fields; title/name may vary
     return {
         "article_id": row.get("article_id"),
         "document_id": row.get("id") or row.get("document_id"),
@@ -52,21 +51,19 @@ def _collect_for_ids(ids: Mapping[str, Any], timeout: int) -> List[Dict[str, Any
             r["_endpoint"] = endpoint
             rows.append(r)
 
-    # Order: table, icd10 (covered/non), then hcpc/revenue/bill types
-    # Each function already handles LCD vs Article and swallows 400s safely.
-    tag_and_extend("code-table",         get_codes_table_any(ids, timeout))
-    tag_and_extend("icd10-covered",      get_icd10_covered_any(ids, timeout))
-    tag_and_extend("icd10-noncovered",   get_icd10_noncovered_any(ids, timeout))
-    tag_and_extend("hcpc-code",          get_hcpc_codes_any(ids, timeout))
-    tag_and_extend("hcpc-modifier",      get_hcpc_modifiers_any(ids, timeout))
-    tag_and_extend("revenue-code",       get_revenue_codes_any(ids, timeout))
-    tag_and_extend("bill-codes",         get_bill_types_any(ids, timeout))
+    # Order matters only for readability; each call is safe and swallows 400s.
+    tag_and_extend("code-table",       get_codes_table_any(ids, timeout))
+    tag_and_extend("icd10-covered",    get_icd10_covered_any(ids, timeout))
+    tag_and_extend("icd10-noncovered", get_icd10_noncovered_any(ids, timeout))
+    tag_and_extend("hcpc-code",        get_hcpc_codes_any(ids, timeout))
+    tag_and_extend("hcpc-modifier",    get_hcpc_modifiers_any(ids, timeout))
+    tag_and_extend("revenue-code",     get_revenue_codes_any(ids, timeout))
+    tag_and_extend("bill-codes",       get_bill_types_any(ids, timeout))
 
     return rows
 
-def _write_csv(rows: List[Dict[str, Any]]) -> None:
+def _write_csv(path: str, rows: List[Dict[str, Any]]) -> None:
     os.makedirs(OUT_DIR, exist_ok=True)
-    # Collect all keys to make a stable header
     header: List[str] = []
     seen = set()
     for r in rows:
@@ -75,13 +72,25 @@ def _write_csv(rows: List[Dict[str, Any]]) -> None:
                 seen.add(k)
                 header.append(k)
     if not header:
-        header = ["_endpoint"]  # minimal header
+        header = ["_endpoint"]  # minimal header to keep a valid CSV
 
-    with open(OUT_CSV, "w", newline="", encoding="utf-8") as f:
+    with open(path, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=header, extrasaction="ignore")
         w.writeheader()
         for r in rows:
             w.writerow(r)
+
+def _write_nocode_csv(path: str, rows: List[Dict[str, Any]]) -> None:
+    """
+    rows is a list of simple dicts with the identifying info for each doc that yielded 0 rows.
+    """
+    os.makedirs(OUT_DIR, exist_ok=True)
+    header = ["_kind", "_document_id", "_document_display_id", "_title"]
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=header, extrasaction="ignore")
+        w.writeheader()
+        for r in rows:
+            w.writerow({k: r.get(k, "") for k in header})
 
 def main() -> None:
     # Read env
@@ -91,28 +100,26 @@ def main() -> None:
     MAX_DOCS    = int(_env("COVERAGE_MAX_DOCS") or "0")
     TIMEOUT     = int(_env("COVERAGE_TIMEOUT")  or "30")
 
+    # Make sure licensed endpoints are okay to call
     try:
-        ensure_license_acceptance()
-    except NameError:
-        print("[WARN] ensure_license_acceptance() not available, skipping.")
-
+        ensure_license_acceptance(timeout=TIMEOUT)
+    except Exception as e:
+        print(f"[WARN] ensure_license_acceptance() failed: {e}. Continuing anyway.", flush=True)
 
     # Discover
     lcds = list_final_lcds(STATES, STATUS, CONTRACTORS, timeout=TIMEOUT)
     arts = list_articles(STATES, STATUS, CONTRACTORS, timeout=TIMEOUT)
     _debug(f"[DEBUG] discovered {len(lcds)} LCDs, {len(arts)} Articles (total {len(lcds)+len(arts)})")
 
-    # Prefer processing Articles first (LCD tables often 400 or empty)
-    work: List[Tuple[str, Dict[str, Any]]] = []
-    for a in arts:
-        work.append(("Article", a))
-    for l in lcds:
-        work.append(("LCD", l))
+    # Prefer Articles first (LCD data endpoints often 400 or empty)
+    work: List[Tuple[str, Dict[str, Any]]] = [("Article", a) for a in arts] + [("LCD", l) for l in lcds]
 
     if MAX_DOCS and len(work) > MAX_DOCS:
         work = work[:MAX_DOCS]
 
     all_rows: List[Dict[str, Any]] = []
+    no_code_rows: List[Dict[str, Any]] = []
+
     processed = 0
     for idx, (kind, row) in enumerate(work, start=1):
         label = _mk_label(row)
@@ -126,7 +133,6 @@ def main() -> None:
             got = []
 
         if got:
-            # add basic document metadata to each row
             for r in got:
                 r["_document_display_id"] = ids.get("document_display_id")
                 r["_document_id"]        = ids.get("document_id")
@@ -136,11 +142,23 @@ def main() -> None:
             all_rows.extend(got)
         else:
             _debug(f"        -> aggregated rows: 0")
+            # Track this document in the no-code CSV
+            no_code_rows.append({
+                "_kind": kind,
+                "_document_id": ids.get("document_id") or "",
+                "_document_display_id": ids.get("document_display_id") or "",
+                "_title": row.get("title") or row.get("name") or "",
+            })
+
         processed += 1
 
-    _write_csv(all_rows)
+    # Write outputs
+    _write_csv(OUT_CSV_CODES, all_rows)
+    _write_nocode_csv(OUT_CSV_NOCODE, no_code_rows)
+
     print(f"[SUMMARY] processed items: {processed}, total rows written: {len(all_rows)}")
-    print(f"[SUMMARY] CSV: {OUT_CSV}")
+    print(f"[SUMMARY] CSV (codes): {OUT_CSV_CODES}")
+    print(f"[SUMMARY] CSV (no-code): {OUT_CSV_NOCODE}  (documents that yielded 0 rows)")
 
 if __name__ == "__main__":
     main()

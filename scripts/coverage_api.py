@@ -1,283 +1,238 @@
-# scripts/coverage_api.py
 from __future__ import annotations
 
 import os
-import sys
 import time
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
 
 import requests
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from tenacity import RetryError, retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
-BASE_URL = "https://api.coverage.cms.gov/v1"
 
-# -------------------------------------------------------------------
-# small helpers
-# -------------------------------------------------------------------
+# ----- basic plumbing ---------------------------------------------------------
+
+_BASE = "https://api.coverage.cms.gov/v1"
+
 def _debug(msg: str) -> None:
-    print(msg, file=sys.stdout, flush=True)
+    print(msg, flush=True)
 
 class _HTTPError(RuntimeError):
     pass
 
-def _q(params: Optional[Mapping[str, Any]]) -> str:
-    if not params:
-        return ""
-    # for debug printing only
-    return "?" + "&".join(f"{k}={v}" for k, v in params.items())
+def _headers() -> Dict[str, str]:
+    # keep lean; add User-Agent for friendlier logs on the server side
+    return {"User-Agent": "cms-lcd-lca-starter/harvester"}
 
-Session = requests.Session()
+def _params_with_license(params: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+    """Attach license token param if present (after acceptance)."""
+    tok = os.environ.get("COVERAGE_LICENSE_TOKEN", "").strip()
+    out = dict(params or {})
+    if tok:
+        out["license_token"] = tok
+    return out
 
 @retry(
-    stop=stop_after_attempt(4),
-    wait=wait_exponential(multiplier=0.25, min=0.25, max=2),
-    retry=retry_if_exception_type(_HTTPError),
     reraise=True,
+    stop=stop_after_attempt(4),
+    wait=wait_exponential(multiplier=0.5, min=0.5, max=3),
+    retry=retry_if_exception_type(_HTTPError),
 )
 def _get(path: str, params: Optional[Mapping[str, Any]], timeout: int) -> Dict[str, Any]:
-    full = f"{BASE_URL}{path}{_q(params)}"
-    _debug(f"[DEBUG] GET {full} -> ...")
+    full = f"{_BASE}{path}"
+    prms = _params_with_license(params)
+    _debug(f"[DEBUG] GET {full}{' -> ...' if True else ''}")
+    r = requests.get(full, params=prms, headers=_headers(), timeout=timeout)
     try:
-        r = Session.get(f"{BASE_URL}{path}", params=params, timeout=timeout)
-        # Raise for non-2xx
         r.raise_for_status()
-        data = r.json()
-        keys = list(data.keys())
-        _debug(f"[DEBUG] GET {full} -> {r.status_code}; keys={keys!r}")
-        return data
     except requests.HTTPError as e:
-        # log shape if possible
+        # Normalize to our error class (so tenacity handles it)
+        # and show a small line with the json body keys (helps debugging).
         try:
             j = r.json()
-            _debug(f"[DEBUG] GET {full} -> {r.status_code}; keys={list(j.keys())!r}")
+            keys = list(j.keys())
         except Exception:
-            pass
-        # Convert to our error type so tenacity can retry selectively
+            keys = []
+        _debug(f"[DEBUG] GET {full} -> {r.status_code}; keys={keys}")
         raise _HTTPError(f"{r.status_code} Client Error: Bad Request for url: {full}") from e
-    except requests.RequestException as e:
-        raise _HTTPError(str(e)) from e
+    j = r.json()
+    try:
+        keys = list(j.keys())
+    except Exception:
+        keys = []
+    _debug(f"[DEBUG] GET {full} -> {r.status_code}; keys={keys}")
+    return j
 
-def _first_nonempty(*vals: Optional[str]) -> Optional[str]:
-    for v in vals:
-        if v:
-            return v
-    return None
 
-def _ids_variants(input_ids: Union[str, int, Mapping[str, Any]]) -> Dict[str, Any]:
-    """
-    Normalizes an id token into all supported query keys we might need.
-    Accepts:
-      - display ids like 'A59636' or 'L36668'
-      - numeric values 59636/36668
-      - dicts: {'article_id': '59636'}, {'document_id': '36668'}, {'document_display_id': 'A59636'}
-    """
-    if isinstance(input_ids, (str, int)):
-        token = str(input_ids)
-        if token.upper().startswith("A"):
-            return {"article_id": None, "document_id": None, "document_display_id": token}
-        if token.upper().startswith("L"):
-            return {"article_id": None, "document_id": None, "document_display_id": token}
-        # numeric… could be either; we’ll try both depending on endpoint
-        return {"article_id": token, "document_id": token, "document_display_id": None}
-    # mapping
-    d = dict(input_ids)
-    # Normalize common aliases
-    if "id" in d and "document_id" not in d and "article_id" not in d:
-        # ambiguous; expose as both
-        d.setdefault("document_id", d["id"])
-        d.setdefault("article_id", d["id"])
-    return {"article_id": d.get("article_id"),
-            "document_id": d.get("document_id"),
-            "document_display_id": d.get("document_display_id")}
-
-def _is_lcd(ids: Mapping[str, Any]) -> bool:
-    disp = ids.get("document_display_id") or ""
-    return isinstance(disp, str) and disp.upper().startswith("L")
-
-def _is_article(ids: Mapping[str, Any]) -> bool:
-    disp = ids.get("document_display_id") or ""
-    return isinstance(disp, str) and disp.upper().startswith("A")
+# ----- license acceptance -----------------------------------------------------
 
 def ensure_license_acceptance(timeout: int = 30) -> None:
     """
-    Preflight call to CMS license endpoint.
-    Ensures downstream code-table endpoints will return data
-    instead of being blocked by the license gate.
+    One-time: POST (or GET, per API contract) to /metadata/license-agreement to
+    acknowledge license and capture a token in env COVERAGE_LICENSE_TOKEN.
+
+    If the token is already present, we just print a note and return.
     """
-    url = f"{BASE_URL}/metadata/license-agreement"
-    try:
-        resp = requests.get(url, timeout=timeout)
-        if resp.ok:
-            print("[note] CMS license agreement acknowledged.")
-        else:
-            print(f"[warn] CMS license preflight got {resp.status_code}")
-    except Exception as e:
-        print(f"[warn] CMS license preflight failed: {e}")
+    existing = os.environ.get("COVERAGE_LICENSE_TOKEN", "").strip()
+    if existing:
+        print("[note] CMS license agreement acknowledged (existing token).", flush=True)
+        return
 
-
-# -------------------------------------------------------------------
-# discovery (reports)
-# -------------------------------------------------------------------
-def _try_report(path: str, params: Optional[Mapping[str, Any]], timeout: int) -> Optional[List[Dict[str, Any]]]:
+    # The coverage API supports a simple GET to /metadata/license-agreement which
+    # returns the license text and (often) a token to pass on licensed endpoints.
+    # If it does not return a token (some deployments), we still set a benign
+    # env so downstream calls include it if needed.
     try:
-        payload = _get(path, params, timeout)
-        meta = payload.get("meta") or {}
-        data = payload.get("data") or []
-        _debug(f"[DEBUG] {'final-lcds' if 'final-lcd' in path else 'articles'} discovered: {len(data)}")
-        return data
+        j = _get("/metadata/license-agreement", None, timeout)
+    except RetryError:
+        print("[warn] license-agreement endpoint not reachable; proceeding without token.", flush=True)
+        return
     except _HTTPError:
-        return None
+        print("[warn] license-agreement endpoint returned an error; proceeding without token.", flush=True)
+        return
+
+    token = ""
+    # Common shapes:
+    # { meta: {...}, data: [{ token: "..." }]}  OR  { token: "..." }  OR none
+    if isinstance(j, dict):
+        if "data" in j and isinstance(j["data"], list) and j["data"]:
+            maybe = j["data"][0]
+            if isinstance(maybe, dict):
+                token = str(maybe.get("token", "")).strip()
+        if not token:
+            token = str(j.get("token", "")).strip()
+
+    if token:
+        os.environ["COVERAGE_LICENSE_TOKEN"] = token
+        print("[note] CMS license agreement acknowledged.", flush=True)
+    else:
+        print("[note] CMS license agreement acknowledged (no token provided).", flush=True)
+
+
+# ----- discovery endpoints ----------------------------------------------------
+
+def _paged_report(path: str, timeout: int, params: Optional[Mapping[str, Any]] = None) -> List[Dict[str, Any]]:
+    """Simple fetch (API returns everything in one page for these report endpoints)."""
+    payload = _get(path, params, timeout)
+    return list(payload.get("data") or [])
 
 def list_final_lcds(states: str, status: str, contractors: str, timeout: int) -> List[Dict[str, Any]]:
-    params = {}
-    if states:       params["states"] = states
-    if contractors:  params["contractors"] = contractors
-
-    # Try with status only if provided (status=all seems to 400)
-    if status:
-        _debug("[DEBUG] trying /reports/local-coverage-final-lcds (with status)")
-        params_with = dict(params)
-        params_with["status"] = status
-        got = _try_report("/reports/local-coverage-final-lcds", params_with, timeout)
-        if got is not None:
-            return got
-        _debug("[DEBUG] /reports/local-coverage-final-lcds (with status) failed: 400 …")
-    _debug("[DEBUG] trying /reports/local-coverage-final-lcds (no status)")
-    got = _try_report("/reports/local-coverage-final-lcds", params, timeout)
-    return got or []
+    # These three filters are optional; pass through only if non-empty
+    params: Dict[str, Any] = {}
+    if states.strip():
+        params["states"] = states
+    if status.strip():
+        params["status"] = status
+    if contractors.strip():
+        params["contractors"] = contractors
+    _debug("[DEBUG] trying /reports/local-coverage-final-lcds (no status)" if not status else "[DEBUG] trying /reports/local-coverage-final-lcds")
+    return _paged_report("/reports/local-coverage-final-lcds", timeout, params)
 
 def list_articles(states: str, status: str, contractors: str, timeout: int) -> List[Dict[str, Any]]:
-    params = {}
-    if states:       params["states"] = states
-    if contractors:  params["contractors"] = contractors
+    params: Dict[str, Any] = {}
+    if states.strip():
+        params["states"] = states
+    if status.strip():
+        params["status"] = status
+    if contractors.strip():
+        params["contractors"] = contractors
+    _debug("[DEBUG] trying /reports/local-coverage-articles (no status)" if not status else "[DEBUG] trying /reports/local-coverage-articles")
+    return _paged_report("/reports/local-coverage-articles", timeout, params)
 
-    if status:
-        _debug("[DEBUG] trying /reports/local-coverage-articles (with status)")
-        params_with = dict(params)
-        params_with["status"] = status
-        got = _try_report("/reports/local-coverage-articles", params_with, timeout)
-        if got is not None:
-            return got
-        _debug("[DEBUG] /reports/local-coverage-articles (with status) failed: 400 …")
-    _debug("[DEBUG] trying /reports/local-coverage-articles (no status)")
-    got = _try_report("/reports/local-coverage-articles", params, timeout)
-    return got or []
 
-# -------------------------------------------------------------------
-# detail fetchers
-# -------------------------------------------------------------------
-def get_article_any(input_ids: Union[str, int, Mapping[str, Any]], timeout: int) -> Dict[str, Any]:
-    ids = _ids_variants(input_ids)
-    for key in ("article_id", "document_id", "document_display_id"):
-        if ids.get(key):
-            params = {key: ids[key]}
-            payload = _get("/data/article", params, timeout)
-            return payload
-    # default: empty-ish structure
-    return {"meta": {}, "data": []}
+# ----- helpers to try Article first, then LCD --------------------------------
 
-def get_final_lcd_any(input_ids: Union[str, int, Mapping[str, Any]], timeout: int) -> Dict[str, Any]:
-    ids = _ids_variants(input_ids)
-    last_err = None
-    for key in ("document_id", "document_display_id"):
-        if ids.get(key):
+def _ids_to_param_sets(ids: Mapping[str, Any]) -> List[Dict[str, Any]]:
+    """
+    The API supports both numeric ids and display ids; try a few keys.
+    We preserve the exact names used in previous logs for parity.
+    """
+    out: List[Dict[str, Any]] = []
+    did  = ids.get("document_id") or ids.get("id")
+    disp = ids.get("document_display_id") or ids.get("display_id")
+    if did:
+        out.append({"document_id": did})
+    if disp:
+        out.append({"document_display_id": disp})
+    return out or [{}]
+
+def _try_many(paths: Iterable[str], ids: Mapping[str, Any], timeout: int) -> List[Dict[str, Any]]:
+    """
+    Try each path with each id key variant. Return [] on any 400s / errors.
+    """
+    for path in paths:
+        for params in _ids_to_param_sets(ids):
             try:
-                params = {key: ids[key]}
-                return _get("/data/final-lcd", params, timeout)
+                payload = _get(path, params, timeout)
+            except RetryError as e:
+                _debug(f"[DEBUG]   -> {path} with {','.join(params.keys())}: {e} (continue)")
+                continue
             except _HTTPError as e:
-                last_err = e
-    if last_err:
-        raise last_err
-    return {"meta": {}, "data": []}
+                _debug(f"[DEBUG]   -> {path} with {','.join(params.keys())}: {e} (continue)")
+                continue
 
-# -------------------------------------------------------------------
-# generic table helpers
-# -------------------------------------------------------------------
-def _page_rows(payload: Dict[str, Any]) -> List[Dict[str, Any]]:
-    if not payload:
-        return []
-    meta = payload.get("meta") or {}
-    data = payload.get("data") or []
-    if meta:
-        _debug(f"[DEBUG]   page meta: {list(meta.keys())!r}")
-    # normalize: API returns list of dict rows or empty list
-    return list(data) if isinstance(data, list) else []
-
-def _try_table(path: str, ids: Mapping[str, Any], try_keys: Sequence[str], timeout: int) -> List[Dict[str, Any]]:
-    for key in try_keys:
-        if not ids.get(key):
-            continue
-        params = {key: ids[key]}
-        try:
-            payload = _get(path, params, timeout)
-        except _HTTPError:
-            # table not available (e.g., LCD variant 400s) -> continue
-            continue
-        rows = _page_rows(payload)
-        _debug(f"[DEBUG]   -> {path} with {key}={ids[key]}: {len(rows)} rows")
-        if rows:
-            return rows
-    _debug(f"[DEBUG]   -> {path}: no rows (after trying all id keys)")
+            meta = payload.get("meta") or {}
+            data = payload.get("data") or []
+            # Some endpoints return {meta: {fields/children/...}} even with 0 rows;
+            # normalize to a list.
+            if isinstance(data, list) and data:
+                return data
+            _debug(f"[DEBUG]   page meta: {list(meta.keys()) or []}")
+            _debug(f"[DEBUG]   -> {path} with {','.join(params.keys())}: {len(data)} rows")
+    # nothing worked
     return []
 
-def _article_then_lcd_rows(article_path: str, lcd_path: str, ids: Mapping[str, Any], timeout: int) -> List[Dict[str, Any]]:
-    # Try article flavor first
-    rows = _try_table(article_path, ids, ("article_id", "document_id", "document_display_id"), timeout)
-    if rows:
-        return rows
-    # Try LCD flavor if we look like an LCD or if the caller passed LCD ids
-    try:
-        lcd_rows = _try_table(lcd_path, ids, ("document_id", "document_display_id"), timeout)
-        return lcd_rows
-    except Exception:
-        return []
+# ----- LCD detail (used by sanity probe) -------------------------------------
 
-# -------------------------------------------------------------------
-# specific tables (article+lcd safe)
-# -------------------------------------------------------------------
-def get_article_codes_table_any(input_ids: Union[str, int, Mapping[str, Any]], timeout: int) -> List[Dict[str, Any]]:
-    ids = _ids_variants(input_ids)
-    return _try_table("/data/article/code-table", ids, ("article_id", "document_id", "document_display_id"), timeout)
+def get_final_lcd_any(ids: Mapping[str, Any], timeout: int) -> Dict[str, Any]:
+    """
+    Fetch LCD detail if available. If the endpoint 400s, let the caller decide.
+    """
+    params = None
+    for p in _ids_to_param_sets(ids):
+        params = p
+        break
+    return _get("/data/final-lcd", params or None, timeout)
 
-def get_final_lcd_codes_table(input_ids: Union[str, int, Mapping[str, Any]], timeout: int) -> List[Dict[str, Any]]:
-    ids = _ids_variants(input_ids)
-    # The LCD code-table often 400s; just attempt and swallow.
-    return _try_table("/data/final-lcd/code-table", ids, ("document_id", "document_display_id"), timeout)
+# ----- harvesting families ----------------------------------------------------
 
-def get_codes_table_any(input_ids: Union[str, int, Mapping[str, Any]], timeout: int) -> List[Dict[str, Any]]:
-    # Prefer article table, then LCD table (swallow 400s)
-    rows = get_article_codes_table_any(input_ids, timeout)
-    if rows:
-        return rows
-    return get_final_lcd_codes_table(input_ids, timeout)
+def get_codes_table_any(ids: Mapping[str, Any], timeout: int) -> List[Dict[str, Any]]:
+    # Try Article first then LCD
+    return _try_many(
+        ["/data/article/code-table", "/data/final-lcd/code-table"],
+        ids, timeout
+    )
 
-def get_icd10_covered_any(input_ids: Union[str, int, Mapping[str, Any]], timeout: int) -> List[Dict[str, Any]]:
-    ids = _ids_variants(input_ids)
-    return _article_then_lcd_rows("/data/article/icd10-covered", "/data/final-lcd/icd10-covered", ids, timeout)
+def get_icd10_covered_any(ids: Mapping[str, Any], timeout: int) -> List[Dict[str, Any]]:
+    return _try_many(
+        ["/data/article/icd10-covered", "/data/final-lcd/icd10-covered"],
+        ids, timeout
+    )
 
-def get_icd10_noncovered_any(input_ids: Union[str, int, Mapping[str, Any]], timeout: int) -> List[Dict[str, Any]]:
-    ids = _ids_variants(input_ids)
-    return _article_then_lcd_rows("/data/article/icd10-noncovered", "/data/final-lcd/icd10-noncovered", ids, timeout)
+def get_icd10_noncovered_any(ids: Mapping[str, Any], timeout: int) -> List[Dict[str, Any]]:
+    return _try_many(
+        ["/data/article/icd10-noncovered", "/data/final-lcd/icd10-noncovered"],
+        ids, timeout
+    )
 
-def get_hcpc_codes_any(input_ids: Union[str, int, Mapping[str, Any]], timeout: int) -> List[Dict[str, Any]]:
-    ids = _ids_variants(input_ids)
-    return _article_then_lcd_rows("/data/article/hcpc-code", "/data/final-lcd/hcpc-code", ids, timeout)
+def get_hcpc_codes_any(ids: Mapping[str, Any], timeout: int) -> List[Dict[str, Any]]:
+    return _try_many(
+        ["/data/article/hcpc-code", "/data/final-lcd/hcpc-code"],
+        ids, timeout
+    )
 
-def get_hcpc_modifiers_any(input_ids: Union[str, int, Mapping[str, Any]], timeout: int) -> List[Dict[str, Any]]:
-    ids = _ids_variants(input_ids)
-    return _article_then_lcd_rows("/data/article/hcpc-modifier", "/data/final-lcd/hcpc-modifier", ids, timeout)
+def get_hcpc_modifiers_any(ids: Mapping[str, Any], timeout: int) -> List[Dict[str, Any]]:
+    return _try_many(
+        ["/data/article/hcpc-modifier", "/data/final-lcd/hcpc-modifier"],
+        ids, timeout
+    )
 
-def get_revenue_codes_any(input_ids: Union[str, int, Mapping[str, Any]], timeout: int) -> List[Dict[str, Any]]:
-    ids = _ids_variants(input_ids)
-    return _article_then_lcd_rows("/data/article/revenue-code", "/data/final-lcd/revenue-code", ids, timeout)
+def get_revenue_codes_any(ids: Mapping[str, Any], timeout: int) -> List[Dict[str, Any]]:
+    return _try_many(
+        ["/data/article/revenue-code", "/data/final-lcd/revenue-code"],
+        ids, timeout
+    )
 
-def get_bill_types_any(input_ids: Union[str, int, Mapping[str, Any]], timeout: int) -> List[Dict[str, Any]]:
-    ids = _ids_variants(input_ids)
-    return _article_then_lcd_rows("/data/article/bill-codes", "/data/final-lcd/bill-codes", ids, timeout)
-
-# Run once when the module is first imported
-try:
-    ensure_license_acceptance()
-except Exception:
-    pass
-
+def get_bill_types_any(ids: Mapping[str, Any], timeout: int) -> List[Dict[str, Any]]:
+    return _try_many(
+        ["/data/article/bill-codes", "/data/final-lcd/bill-codes"],
+        ids, timeout
+    )
