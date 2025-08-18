@@ -19,10 +19,14 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python
-        id: setup-python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: |
+            requirements.txt
+            **/requirements.txt
+
 
       - name: Cache pip
         uses: actions/cache@v4
@@ -46,16 +50,16 @@ jobs:
         env:
           SHARD_INDEX: ${{ matrix.shard }}
           SHARD_TOTAL: ${{ matrix.total }}
-          SHARD_BATCH_SIZE: "50"   # files per batch; tune based on your harvester
+           # (optional) SHARD_BATCH_SIZE, COVERAGE_MAX_DOCS, etc.
         run: |
-          python scripts/harvest_shard.py
+          mkdir -p .harvest_logs
+          python -m scripts.run_once 2>&1 | tee .harvest_logs/shard-${{ matrix.shard }}.log
+          test ${PIPESTATUS[0]} -eq 0
 
       - name: Upload artifact (per-shard logs)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: harvest-logs-shard-${{ matrix.shard }}
-          path: |
-            .harvest_logs/**
-            **/harvest_shard_*.log
-          if-no-files-found: ignore
+          path: .harvest_logs/shard-${{ matrix.shard }}.log
+          if-no-files-found: error
