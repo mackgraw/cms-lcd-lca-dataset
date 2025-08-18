@@ -1,5 +1,7 @@
+# scripts/run_once.py
 from __future__ import annotations
 
+import argparse
 import csv
 import os
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
@@ -92,8 +94,61 @@ def _write_nocode_csv(path: str, rows: List[Dict[str, Any]]) -> None:
         for r in rows:
             w.writerow({k: r.get(k, "") for k in header})
 
+def _parse_args():
+    ap = argparse.ArgumentParser(description="Coverage harvest runner")
+    ap.add_argument("--file", help="Process a single document identifier (document_id, display_id, or article_id)")
+    ap.add_argument("--manifest", help="Path to a newline-delimited list of document identifiers to process")
+    # keep compatibility with other unknown args your code may pass around
+    return ap.parse_known_args()
+
+def _load_manifest(path: str) -> List[str]:
+    from pathlib import Path
+    p = Path(path)
+    if not p.exists():
+        raise FileNotFoundError(f"Manifest not found: {p}")
+    return [ln.strip() for ln in p.read_text(encoding="utf-8").splitlines() if ln.strip()]
+
+def _id_keys(row: Mapping[str, Any]) -> List[str]:
+    """All comparable identifiers for a row, coerced to strings."""
+    ids = _mk_ids(row)
+    vals = [ids.get("document_id"), ids.get("document_display_id"), ids.get("article_id")]
+    return [str(v) for v in vals if v not in (None, "")]
+
+def _select_work(work: List[Tuple[str, Dict[str, Any]]], allow_ids: Optional[set[str]]) -> List[Tuple[str, Dict[str, Any]]]:
+    if not allow_ids:
+        return work
+    selected = []
+    for item in work:
+        _, row = item
+        keys = _id_keys(row)
+        if any(k in allow_ids for k in keys):
+            selected.append(item)
+    return selected
+
+def _shard_filter(work: List[Tuple[str, Dict[str, Any]]], shard_index: int, shard_total: int) -> List[Tuple[str, Dict[str, Any]]]:
+    """Deterministically select a slice of work by hashing a stable identifier."""
+    import hashlib
+    if shard_total <= 1:
+        return work
+    out: List[Tuple[str, Dict[str, Any]]] = []
+    for item in work:
+        _, row = item
+        keys = _id_keys(row)
+        # prefer display id -> document id -> article id
+        key = (keys[0] if keys else "")
+        h = hashlib.md5(key.encode("utf-8")).hexdigest()
+        if int(h, 16) % shard_total == shard_index:
+            out.append(item)
+    return out
+
 def main() -> None:
-    # Read env
+    # Args (manifest / file) and ENV (for sharding)
+    args, unknown = _parse_args()
+
+    SHARD_INDEX = int(os.environ.get("SHARD_INDEX", "0") or "0")
+    SHARD_TOTAL = int(os.environ.get("SHARD_TOTAL", "1") or "1")
+
+    # Read env (existing behavior)
     STATES      = _env("COVERAGE_STATES")
     STATUS      = _env("COVERAGE_STATUS")
     CONTRACTORS = _env("COVERAGE_CONTRACTORS")
@@ -114,6 +169,25 @@ def main() -> None:
     # Prefer Articles first (LCD data endpoints often 400 or empty)
     work: List[Tuple[str, Dict[str, Any]]] = [("Article", a) for a in arts] + [("LCD", l) for l in lcds]
 
+    # Apply allowlist from CLI (manifest / file)
+    allow_ids: Optional[set[str]] = None
+    if args.file and args.manifest:
+        raise SystemExit("--file and --manifest are mutually exclusive")
+    if args.file:
+        allow_ids = {args.file.strip()}
+    elif args.manifest:
+        allow_ids = set(_load_manifest(args.manifest))
+    if allow_ids:
+        work = _select_work(work, allow_ids)
+        _debug(f"[DEBUG] after allowlist: {len(work)} items")
+
+    # If no allowlist, apply shard envs
+    if not allow_ids:
+        before = len(work)
+        work = _shard_filter(work, SHARD_INDEX, SHARD_TOTAL)
+        _debug(f"[DEBUG] shard {SHARD_INDEX}/{SHARD_TOTAL} -> {len(work)} of {before} items")
+
+    # Truncate if requested
     if MAX_DOCS and len(work) > MAX_DOCS:
         work = work[:MAX_DOCS]
 
@@ -142,7 +216,6 @@ def main() -> None:
             all_rows.extend(got)
         else:
             _debug(f"        -> aggregated rows: 0")
-            # Track this document in the no-code CSV
             no_code_rows.append({
                 "_kind": kind,
                 "_document_id": ids.get("document_id") or "",
