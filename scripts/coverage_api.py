@@ -11,6 +11,36 @@ BASE_URL = "https://api.coverage.cms.gov/v1"
 USER_AGENT = "cms-lcd-lca-dataset/harvester (+https://github.com/)"
 
 
+def _none_if_blank(v: Any) -> Optional[Any]:
+    """Return None if v is None, '', or all-whitespace; else v as-is."""
+    if v is None:
+        return None
+    if isinstance(v, str) and v.strip() == "":
+        return None
+    return v
+
+def _csv_or_none(v: Optional[str]) -> Optional[str]:
+    """Normalize a CSV string; drop if it ends up empty."""
+    if v is None:
+        return None
+    items = [p.strip() for p in v.split(",")]
+    items = [p for p in items if p]
+    return ",".join(items) if items else None
+
+def build_params(**kwargs: Any) -> Dict[str, Any]:
+    """
+    Build a query params dict, stripping out any None/empty/whitespace values.
+    Pass ALL candidate params and let this drop the blanks.
+    """
+    out: Dict[str, Any] = {}
+    for k, v in kwargs.items():
+        if isinstance(v, str) and k.lower() in {"states", "state", "contractors", "contractor"}:
+            v = _csv_or_none(v)  # normalize CSV filters
+        v = _none_if_blank(v)
+        if v is not None:
+            out[k] = v
+    return out
+
 def _env(name: str, default: str = "") -> str:
     val = os.getenv(name, default)
     print(f"[PY-ENV] {name} = {val}")
