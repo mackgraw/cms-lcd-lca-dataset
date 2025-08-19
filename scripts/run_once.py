@@ -12,16 +12,14 @@ from typing import Any, Dict, List, Mapping, Optional, Tuple
 # NOTE: these functions are expected in scripts.coverage_api per your repo
 from scripts.coverage_api import (
     ensure_license_acceptance,
-    list_final_lcds,
-    list_articles,
+    get_report,
+    get_article_page,
+    get_lcd_page,
     get_codes_table_any,
-    get_icd10_covered_any,
-    get_icd10_noncovered_any,
-    get_hcpc_codes_any,
-    get_hcpc_modifiers_any,
-    get_revenue_codes_any,
-    get_bill_types_any,
+    fetch_article_endpoint,
+    fetch_lcd_endpoint,
 )
+
 
 OUT_DIR = Path("dataset")
 OUT_DIR.mkdir(parents=True, exist_ok=True)

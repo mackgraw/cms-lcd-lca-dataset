@@ -2,185 +2,252 @@
 from __future__ import annotations
 
 import os
+import sys
 import time
-import typing as t
-import urllib.parse
+from typing import Any, Dict, Optional, Tuple
 import requests
 
 BASE_URL = "https://api.coverage.cms.gov/v1"
+DEFAULT_TIMEOUT = float(os.environ.get("COVERAGE_TIMEOUT", "30"))  # seconds
 
-# Optional bearer token from the license-agreement endpoint.
-# We tolerate missing token and proceed (public endpoints).
-LICENSE_BEARER = os.environ.get("COVERAGE_LICENSE_BEARER", "").strip()
+class CoverageApiError(RuntimeError):
+    def __init__(self, status: int, url: str, payload: Optional[dict] = None, text: str = ""):
+        self.status = status
+        self.url = url
+        self.payload = payload or {}
+        self.text = text or ""
+        # short message from server if available
+        msg = self.payload.get("message") or self.text
+        short = (msg or "").replace("\n", " ")[:120]
+        super().__init__(f"{status} for {url}: {short}")
 
-# ---- Utilities --------------------------------------------------------------
+def _short_error(msg: str) -> str:
+    return (msg or "").replace("\n", " ")[:120]
 
-class ApiError(RuntimeError):
-    pass
+def _mk_session() -> requests.Session:
+    s = requests.Session()
+    s.headers.update({"User-Agent": "cms-harvest/1.0"})
+    return s
 
-
-def _headers() -> dict:
-    h = {"Accept": "application/json"}
-    if LICENSE_BEARER:
-        h["Authorization"] = f"Bearer {LICENSE_BEARER}"
-    return h
-
-
-def _sleep_backoff(attempt: int) -> None:
-    time.sleep(min(1.5 * attempt, 6.0))
-
-
-def _is_known_fake_400(payload: t.Any) -> bool:
+def api_get(
+    path: str,
+    params: Optional[Dict[str, Any]] = None,
+    *,
+    session: Optional[requests.Session] = None,
+    timeout: float = DEFAULT_TIMEOUT,
+    log: Any = print,
+    allow_4xx: bool = False,
+) -> Tuple[int, Dict[str, Any]]:
     """
-    The API returns 400 with a friendly message when you hit a non-existent route
-    family like /data/lcd/code-table. Treat those as 'endpoint not available'.
+    GET {BASE_URL}{path}. Returns (status_code, json_dict).
+    On 4xx/5xx: if allow_4xx is False, raises CoverageApiError (after logging a 120‑char excerpt).
+                if allow_4xx is True, returns (status, json_dict) for the caller to handle.
     """
-    if not isinstance(payload, dict):
-        return False
-    msg = str(payload.get("message", "")).lower()
-    return "please reference the documentation" in msg or "swagger" in msg
+    if not path.startswith("/"):
+        path = "/" + path
+    url = BASE_URL + path
 
+    sess = session or _mk_session()
+    log(f"[DEBUG] GET {url} -> ...")
+    try:
+        r = sess.get(url, params=params or {}, timeout=timeout)
+    except requests.RequestException as e:
+        raise CoverageApiError(0, url, text=str(e)) from e
 
-def _get(path: str, params: dict | None = None, tolerate_404=False) -> dict:
-    url = urllib.parse.urljoin(BASE_URL + "/", path.lstrip("/"))
-    for attempt in range(1, 5):
-        r = requests.get(url, params=params or {}, headers=_headers(), timeout=60)
-        ct = r.headers.get("content-type", "")
-        is_json = "json" in ct
-        data = r.json() if is_json else {"status_code": r.status_code, "text": r.text}
+    status = r.status_code
+    try:
+        data = r.json()
+    except ValueError:
+        data = {}
 
-        if r.status_code == 200:
-            return data
+    keys = list(data.keys()) if isinstance(data, dict) else []
+    if status >= 400:
+        msg = ""
+        if isinstance(data, dict):
+            msg = data.get("message") or data.get("error") or ""
+        else:
+            msg = r.text or ""
+        short = _short_error(msg)
+        log(f"[DEBUG] GET {url} -> {status}; keys={keys!r}; message={short}")
+        if allow_4xx:
+            return status, data if isinstance(data, dict) else {"raw": r.text}
+        raise CoverageApiError(status, url, payload=data if isinstance(data, dict) else {}, text=r.text)
 
-        if r.status_code in (404,) and tolerate_404:
-            return {"meta": {"status": {"id": 404, "message": "not found"}}, "data": []}
+    log(f"[DEBUG] GET {url} -> {status}; keys={keys!r}")
+    return status, data if isinstance(data, dict) else {"data": data}
 
-        # Known "friendly 400" when endpoint doesn’t exist
-        if r.status_code == 400 and _is_known_fake_400(data):
-            return {"meta": {"status": {"id": 400, "message": "endpoint not available"}}, "data": []}
-
-        # Retry on 5xx and transient 4xx
-        if r.status_code >= 500 or r.status_code in (408, 429):
-            _sleep_backoff(attempt)
-            continue
-
-        # Hard error
-        raise ApiError(f"GET {url} -> {r.status_code}: {data!r}")
-
-    raise ApiError(f"GET {url} failed after retries.")
-
-# ---- Article endpoints ------------------------------------------------------
-
-def get_article(article_id: str, ver: str | None = None) -> dict:
-    params = {"articleid": article_id}
-    if ver:
-        params["ver"] = ver
-    return _get("/data/article/", params)
-
-def get_article_code_table(article_id: str, ver: str | None = None) -> dict:
-    params = {"articleid": article_id}
-    if ver:
-        params["ver"] = ver
-    return _get("/data/article/code-table", params)
-
-def get_article_icd10_covered(article_id: str, ver: str | None = None) -> dict:
-    params = {"articleid": article_id}
-    if ver:
-        params["ver"] = ver
-    return _get("/data/article/icd10-covered", params)
-
-def get_article_icd10_noncovered(article_id: str, ver: str | None = None) -> dict:
-    params = {"articleid": article_id}
-    if ver:
-        params["ver"] = ver
-    return _get("/data/article/icd10-noncovered", params)
-
-def get_article_icd10_pcs(article_id: str, ver: str | None = None) -> dict:
-    params = {"articleid": article_id}
-    if ver:
-        params["ver"] = ver
-    return _get("/data/article/icd10-pcs-code", params)
-
-def get_article_hcpc_code(article_id: str, ver: str | None = None) -> dict:
-    params = {"articleid": article_id}
-    if ver:
-        params["ver"] = ver
-    return _get("/data/article/hcpc-code", params)
-
-# ---- LCD endpoints (VALID ones only) ---------------------------------------
-
-def get_lcd(lcdid: str, ver: str | None = None) -> dict:
-    params = {"lcdid": lcdid}
-    if ver:
-        params["ver"] = ver
-    return _get("/data/lcd/", params)
-
-def get_lcd_hcpc_code(lcdid: str, ver: str | None = None) -> dict:
-    params = {"lcdid": lcdid}
-    if ver:
-        params["ver"] = ver
-    return _get("/data/lcd/hcpc-code", params)
-
-def get_lcd_hcpc_code_group(lcdid: str, ver: str | None = None) -> dict:
-    params = {"lcdid": lcdid}
-    if ver:
-        params["ver"] = ver
-    return _get("/data/lcd/hcpc-code-group", params)
-
-def get_lcd_contractor(lcdid: str, ver: str | None = None) -> dict:
-    params = {"lcdid": lcdid}
-    if ver:
-        params["ver"] = ver
-    return _get("/data/lcd/contractor", params)
-
-def get_lcd_revision_history(lcdid: str, ver: str | None = None) -> dict:
-    params = {"lcdid": lcdid}
-    if ver:
-        params["ver"] = ver
-    return _get("/data/lcd/revision-history", params)
-
-def get_lcd_primary_jurisdiction(lcdid: str, ver: str | None = None) -> dict:
-    params = {"lcdid": lcdid}
-    if ver:
-        params["ver"] = ver
-    return _get("/data/lcd/primary-jurisdiction", params)
-
-# ---- Helpers used by run_once ----------------------------------------------
-
-def get_codes_table_any(document_type: str, identifier: str, ver: str | None = None) -> dict:
+def ensure_license_acceptance(
+    *,
+    session: Optional[requests.Session] = None,
+    log: Any = print,
+) -> Optional[str]:
     """
-    Unified helper used by the pipeline:
-      - For ARTICLES: returns SAD exclusion code table (/data/article/code-table)
-      - For LCDs: there is NO equivalent 'code-table'; return an empty shape.
+    Calls /metadata/license-agreement to acknowledge license. Returns token (if server provides one).
     """
-    dt = document_type.lower().strip()
-    if dt == "article":
-        return get_article_code_table(identifier, ver)
-    if dt == "lcd":
-        # No such endpoint for LCDs; return empty structure but valid meta.
-        return {"meta": {"status": {"id": 200, "message": "ok"}}, "data": []}
-    raise ValueError(f"Unsupported document_type: {document_type}")
+    status, js = api_get("/metadata/license-agreement", session=session, log=log)
+    token = None
+    # CMS sometimes returns token under 'data' or 'meta'
+    if isinstance(js, dict):
+        if isinstance(js.get("data"), dict):
+            token = js["data"].get("token") or js["data"].get("value")
+        if not token and isinstance(js.get("meta"), dict):
+            token = js["meta"].get("token") or js["meta"].get("value")
+    if token:
+        log(f"[note] CMS license agreement acknowledged (token present).")
+    else:
+        log(f"[note] CMS license agreement acknowledged (no token provided).")
+    return token
 
-def get_icd10_any(document_type: str, identifier: str, ver: str | None = None) -> dict:
+# -------- Reports helpers --------
+
+def get_report(report_path: str, params: Optional[Dict[str, Any]] = None, *, session: Optional[requests.Session] = None, log: Any = print) -> Dict[str, Any]:
     """
-    Returns ICD-10 data:
-      - For ARTICLES: use icd10-covered + icd10-noncovered.
-      - For LCDs: NO /data/lcd/icd10-* endpoints exist; return empty.
+    Fetch a /reports/... endpoint. Example: '/reports/local-coverage-articles'
     """
-    dt = document_type.lower().strip()
-    if dt == "article":
-        covered = get_article_icd10_covered(identifier, ver)
-        noncov = get_article_icd10_noncovered(identifier, ver)
-        pcs = get_article_icd10_pcs(identifier, ver)
-        # Merge into a single payload for convenience
-        return {
-            "meta": {"status": {"id": 200, "message": "ok"}},
-            "data": {
-                "covered": covered.get("data", []),
-                "noncovered": noncov.get("data", []),
-                "pcs": pcs.get("data", []),
-            },
-        }
-    if dt == "lcd":
-        return {"meta": {"status": {"id": 200, "message": "ok"}}, "data": {"covered": [], "noncovered": [], "pcs": []}}
-    raise ValueError(f"Unsupported document_type: {document_type}")
+    if not report_path.startswith("/"):
+        report_path = "/" + report_path
+    if not report_path.startswith("/reports/"):
+        report_path = "/reports" + report_path
+    return api_get(report_path, params=params, session=session, log=log)[1]
+
+# -------- Data helpers (Article/LCD) --------
+
+def get_article_page(endpoint: str, params: Optional[Dict[str, Any]] = None, *, session: Optional[requests.Session] = None, log: Any = print, allow_4xx: bool = False) -> Tuple[int, Dict[str, Any]]:
+    """
+    GET /data/article/<endpoint>
+    """
+    ep = endpoint.strip("/")
+    return api_get(f"/data/article/{ep}", params=params, session=session, log=log, allow_4xx=allow_4xx)
+
+def get_lcd_page(endpoint: str, params: Optional[Dict[str, Any]] = None, *, session: Optional[requests.Session] = None, log: Any = print, allow_4xx: bool = False) -> Tuple[int, Dict[str, Any]]:
+    """
+    GET /data/lcd/<endpoint>
+    """
+    ep = endpoint.strip("/")
+    return api_get(f"/data/lcd/{ep}", params=params, session=session, log=log, allow_4xx=allow_4xx)
+
+# -------- Specific helpers used by the harvester --------
+
+VALID_ARTICLE_ENDPTS = {
+    "code-table",               # SAD exclusion code table (Articles only)
+    "icd10-covered",
+    "icd10-covered-group",
+    "icd10-noncovered",
+    "icd10-noncovered-group",
+    "icd10-pcs-code",
+    "icd10-pcs-code-group",
+    "hcpc-code",
+    "hcpc-code-group",
+    "hcpc-modifier",
+    "hcpc-modifier-group",
+    "revenue-code",
+    "bill-codes",
+    # ... add more article endpoints as needed
+}
+
+VALID_LCD_ENDPTS = {
+    "hcpc-code",
+    "hcpc-code-group",
+    "revision-history",
+    "related-documents",
+    "related-ncd-documents",
+    "future-retire",
+    "primary-jurisdiction",
+    "tracking-sheet",
+    "urls",
+    "attachments",
+    "reason-change",
+    "advisory-committee",
+    "contractor",
+    "synopsis-changes",
+    # ... add more LCD endpoints as needed
+}
+
+def get_codes_table_any(ids: Dict[str, Any], *, session: Optional[requests.Session] = None, log: Any = print) -> Dict[str, Any]:
+    """
+    Try retrieving the Article SAD Exclusion 'code-table'.
+    (LCDs do NOT have a 'code-table' endpoint; calling it will 400. We avoid that.)
+    We attempt multiple parameter keys if available.
+    """
+    keys_sets = [
+        ("article_id", "document_version"),
+        ("article_display_id", "document_version"),
+        ("document_id", "document_version"),
+        ("document_display_id", "document_version"),
+        ("article_id",),
+        ("article_display_id",),
+        ("document_id",),
+        ("document_display_id",),
+    ]
+
+    for keys in keys_sets:
+        params = {k: ids[k] for k in keys if k in ids and ids[k] is not None}
+        status, js = get_article_page("code-table", params=params, session=session, log=log)
+        meta = js.get("meta", {}) if isinstance(js, dict) else {}
+        rows = js.get("data", []) if isinstance(js, dict) else []
+        log(f"[DEBUG]   -> /data/article/code-table with {','.join(keys) if keys else '(no-params)'}: {len(rows) if isinstance(rows, list) else 0} rows")
+    # Return the last response (your harvester aggregates rows itself)
+    return js
+
+def fetch_article_endpoint(endpoint: str, ids: Dict[str, Any], *, session: Optional[requests.Session] = None, log: Any = print) -> Dict[str, Any]:
+    """
+    Generic fetcher for /data/article/<endpoint> using a variety of ID params.
+    """
+    if endpoint not in VALID_ARTICLE_ENDPTS:
+        # Allow but warn — still try since API evolves.
+        log(f"[DEBUG] WARNING: endpoint '{endpoint}' not in known VALID_ARTICLE_ENDPTS; attempting anyway.")
+
+    key_orders = [
+        ("article_id", "document_version"),
+        ("article_display_id", "document_version"),
+        ("document_id", "document_version"),
+        ("document_display_id", "document_version"),
+        ("article_id",),
+        ("article_display_id",),
+        ("document_id",),
+        ("document_display_id",),
+        (),  # no params
+    ]
+    last = {}
+    for keys in key_orders:
+        params = {k: ids[k] for k in keys if k in ids and ids[k] is not None}
+        status, js = get_article_page(endpoint, params=params, session=session, log=log)
+        rows = js.get("data", []) if isinstance(js, dict) else []
+        log(f"[DEBUG]   -> /data/article/{endpoint} with {','.join(keys) if keys else '(no-params)'}: {len(rows) if isinstance(rows, list) else 0} rows")
+        last = js
+    return last
+
+def fetch_lcd_endpoint(endpoint: str, ids: Dict[str, Any], *, session: Optional[requests.Session] = None, log: Any = print) -> Dict[str, Any]:
+    """
+    Generic fetcher for /data/lcd/<endpoint> using a variety of ID params.
+    NOTE: Will log (and *not* raise) 400s so the harvester can continue.
+    """
+    if endpoint not in VALID_LCD_ENDPTS:
+        log(f"[DEBUG] WARNING: endpoint '{endpoint}' not in known VALID_LCD_ENDPTS; attempting anyway.")
+    key_orders = [
+        ("lcd_id", "document_version"),
+        ("lcd_display_id", "document_version"),
+        ("document_id", "document_version"),
+        ("document_display_id", "document_version"),
+        ("lcd_id",),
+        ("lcd_display_id",),
+        ("document_id",),
+        ("document_display_id",),
+        (),  # no params
+    ]
+    last = {}
+    for keys in key_orders:
+        params = {k: ids[k] for k in keys if k in ids and ids[k] is not None}
+        status, js = get_lcd_page(endpoint, params=params, session=session, log=log, allow_4xx=True)
+        if status >= 400:
+            # Log with first 120 chars (api_get already prints it, but we echo a concise line here too)
+            msg = ""
+            if isinstance(js, dict):
+                msg = js.get("message") or js.get("error") or ""
+            short = _short_error(msg)
+            log(f"[DEBUG]   -> /data/lcd/{endpoint} with {','.join(keys) if keys else '(no-params)'}: {status} for {BASE_URL}/data/lcd/{endpoint}: {short} (continue)")
+        else:
+            rows = js.get("data", []) if isinstance(js, dict) else []
+            log(f"[DEBUG]   -> /data/lcd/{endpoint} with {','.join(keys) if keys else '(no-params)'}: {len(rows) if isinstance(rows, list) else 0} rows")
+        last = js
+    return last
