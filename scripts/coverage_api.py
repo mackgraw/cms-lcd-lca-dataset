@@ -1,279 +1,250 @@
+# scripts/coverage_api.py
 from __future__ import annotations
 
+import json
 import os
-import time
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
+import textwrap
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import requests
 
 
-BASE_URL = "https://api.coverage.cms.gov/v1"
-USER_AGENT = "cms-lcd-lca-dataset/harvester (+https://github.com/)"
-
-
-def _none_if_blank(v: Any) -> Optional[Any]:
-    """Return None if v is None, '', or all-whitespace; else v as-is."""
-    if v is None:
-        return None
-    if isinstance(v, str) and v.strip() == "":
-        return None
-    return v
-
-def _csv_or_none(v: Optional[str]) -> Optional[str]:
-    """Normalize a CSV string; drop if it ends up empty."""
-    if v is None:
-        return None
-    items = [p.strip() for p in v.split(",")]
-    items = [p for p in items if p]
-    return ",".join(items) if items else None
-
-def build_params(**kwargs: Any) -> Dict[str, Any]:
-    """
-    Build a query params dict, stripping out any None/empty/whitespace values.
-    Pass ALL candidate params and let this drop the blanks.
-    """
-    out: Dict[str, Any] = {}
-    for k, v in kwargs.items():
-        if isinstance(v, str) and k.lower() in {"states", "state", "contractors", "contractor"}:
-            v = _csv_or_none(v)  # normalize CSV filters
-        v = _none_if_blank(v)
-        if v is not None:
-            out[k] = v
-    return out
-
-def _env(name: str, default: str = "") -> str:
-    val = os.getenv(name, default)
-    print(f"[PY-ENV] {name} = {val}")
-    return val
+BASE_URL = "https://api.coverage.cms.gov"
 
 
 def _debug(msg: str) -> None:
-    print(f"[DEBUG] {msg}")
+    print(f"[DEBUG] {msg}", flush=True)
 
 
-def _truncate_err_message(msg: Any, limit: int = 120) -> str:
+def short_error_text(payload: Any, limit: int = 120) -> str:
+    """
+    Return the first `limit` chars of a server error message when present.
+    """
     try:
-        s = str(msg)
+        if isinstance(payload, dict):
+            # common CMS error payload uses 'message'
+            m = payload.get("message")
+            if m:
+                return str(m)[:limit]
+            # sometimes nested
+            data = payload.get("data")
+            if isinstance(data, dict) and "message" in data:
+                return str(data["message"])[:limit]
+        return (json.dumps(payload) if not isinstance(payload, str) else payload)[:limit]
     except Exception:
-        s = repr(msg)
-    if len(s) > limit:
-        return s[:limit]
-    return s
+        return "<unreadable error>"
 
 
-def _session(timeout: int = 30) -> requests.Session:
-    s = requests.Session()
-    s.headers.update({"User-Agent": USER_AGENT})
-    # don’t reuse proxies/token/etc. API is public
-    s.trust_env = True
-    s.request = s.request  # type: ignore[attr-defined]
-    s.timeout = timeout  # just to carry a default
-    return s
+def build_params(raw: Dict[str, Optional[str]]) -> Dict[str, str]:
+    """
+    Clean query params by removing None/empty/whitespace-only values.
+    """
+    out: Dict[str, str] = {}
+    for k, v in raw.items():
+        if v is None:
+            continue
+        s = str(v).strip()
+        if not s or s == '""':
+            # treat empty-string envs as unset (no filter)
+            continue
+        out[k] = s
+    return out
 
 
-def _get_json(path: str, params: Optional[Mapping[str, Any]] = None, timeout: int = 30) -> Dict[str, Any]:
+def _get(session: requests.Session, path: str, params: Optional[Dict[str, Any]] = None, timeout: Optional[int] = None) -> Tuple[int, Dict[str, Any]]:
     url = f"{BASE_URL}{path}"
     _debug(f"GET {url} -> ...")
+    resp = session.get(url, params=params or {}, timeout=timeout)
+    status = resp.status_code
     try:
-        r = requests.get(url, params=params or {}, timeout=timeout, headers={"User-Agent": USER_AGENT})
-        if r.status_code >= 400:
-            # Try to show the API’s short message if present
-            msg = None
-            try:
-                j = r.json()
-                msg = j.get("message") or j.get("error") or j
-            except Exception:
-                msg = r.text
-            short = _truncate_err_message(msg)
-            _debug(f"GET {url} -> {r.status_code}; keys={list(getattr(r, 'json', lambda: {})() or {}).keys() if r.headers.get('content-type','').startswith('application/json') else []}; message={short}")
-            return {"meta": {"status": r.status_code, "notes": short}, "data": []}
-        j = r.json()
-        _debug(f"GET {url} -> {r.status_code}; keys={list(j.keys())}")
-        return j
-    except Exception as e:
-        short = _truncate_err_message(e)
-        return {"meta": {"status": 599, "notes": short}, "data": []}
+        payload = resp.json()
+    except Exception:
+        payload = {"message": f"Non-JSON response, status={status}", "text": resp.text[:120]}
+    if status != 200:
+        _debug(f"GET {url} -> {status}; keys={list(payload.keys())}; message={short_error_text(payload)}")
+    else:
+        _debug(f"GET {url} -> {status}; keys={list(payload.keys())}")
+    return status, payload
 
 
-# -------------------------
-# Metadata / license
-# -------------------------
-def ensure_license_acceptance(timeout: int = 30) -> None:
+def ensure_license_acceptance(session: Optional[requests.Session] = None) -> None:
     """
-    Calls the license endpoint; prints what the server returns.
-    Signature includes 'timeout' to match callers.
+    Swagger shows GET /v1/metadata/license-agreement/ – API accepts without trailing slash too.
     """
-    j = _get_json("/metadata/license-agreement", timeout=timeout)
-    keys = list(j.keys())
-    _debug(f"GET {BASE_URL}/metadata/license-agreement -> {j.get('meta', {}).get('status', 200)}; keys={keys}")
-    print("[note] CMS license agreement acknowledged (no token provided).")
+    close_after = False
+    if session is None:
+        session = requests.Session()
+        close_after = True
+    try:
+        _debug(f"GET {BASE_URL}/v1/metadata/license-agreement -> ...")
+        status, payload = _get(session, "/v1/metadata/license-agreement")
+        if status == 200:
+            print("[note] CMS license agreement acknowledged (no token provided).")
+        else:
+            msg = short_error_text(payload)
+            print(f"[warn] License agreement call returned {status}: {msg}")
+    finally:
+        if close_after:
+            session.close()
 
 
-# -------------------------
-# Reports (lists of docs)
-# -------------------------
-def list_final_lcds(states: str = "", status: str = "", contractors: str = "", timeout: int = 30) -> List[Dict[str, Any]]:
-    params: Dict[str, Any] = {}
-    if states:
-        params["states"] = states
-    if status:
-        params["status"] = status
-    if contractors:
-        params["contractors"] = contractors
-    j = _get_json("/reports/local-coverage-final-lcds", params=params, timeout=timeout)
-    return j.get("data", []) or []
-
-
-def list_articles(states: str = "", status: str = "", contractors: str = "", timeout: int = 30) -> List[Dict[str, Any]]:
-    params: Dict[str, Any] = {}
-    if states:
-        params["states"] = states
-    if status:
-        params["status"] = status
-    if contractors:
-        params["contractors"] = contractors
-    j = _get_json("/reports/local-coverage-articles", params=params, timeout=timeout)
-    return j.get("data", []) or []
-
-
-# -------------------------
-# ID helpers
-# -------------------------
-def possible_article_param_sets(ids: Mapping[str, Any]) -> List[Dict[str, Any]]:
-    """Return parameter combos to try for article endpoints (best-first)."""
-    combos: List[Dict[str, Any]] = []
-    # Prefer explicit id + version combos first
-    for a_id_key in ("article_id", "document_id", "article_display_id", "document_display_id"):
-        if ids.get(a_id_key) and ids.get("document_version"):
-            combos.append({a_id_key: ids[a_id_key], "document_version": ids["document_version"]})
-    # Then single keys
-    for a_id_key in ("article_id", "document_id", "article_display_id", "document_display_id"):
-        if ids.get(a_id_key):
-            combos.append({a_id_key: ids[a_id_key]})
-    # Fallback empty (some endpoints allow it, usually returns empty)
-    combos.append({})
-    return combos
-
-
-def possible_lcd_param_sets(ids: Mapping[str, Any]) -> List[Dict[str, Any]]:
-    """Return parameter combos to try for LCD endpoints (best-first)."""
-    combos: List[Dict[str, Any]] = []
-    for k in ("lcd_id", "document_id", "lcd_display_id", "document_display_id"):
-        if ids.get(k) and ids.get("document_version"):
-            combos.append({k: ids[k], "document_version": ids["document_version"]})
-    for k in ("lcd_id", "document_id", "lcd_display_id", "document_display_id"):
-        if ids.get(k):
-            combos.append({k: ids[k]})
-    combos.append({})
-    return combos
-
-
-def _page(path: str, param_sets: Sequence[Mapping[str, Any]], timeout: int = 30) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+def fetch_local_reports(
+    session: requests.Session,
+    states: Optional[str] = None,
+    status: Optional[str] = None,
+    contractors: Optional[str] = None,
+    timeout: Optional[int] = None,
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     """
-    Try each parameter set until we either get a non-empty data array or we run out.
-    Return (rows, last_meta).
+    Pull local coverage 'final-lcds' and 'articles' report lists.
+    All filters are optional; empty/whitespace strings are ignored.
     """
-    last_meta: Dict[str, Any] = {}
-    for params in param_sets:
-        keys = ",".join(params.keys()) or "(no-params)"
-        _debug(f"  -> trying {path} with {keys}")
-        j = _get_json(path, params=params, timeout=timeout)
-        meta = j.get("meta", {})
-        data = j.get("data", []) or []
-        last_meta = meta
-        if data:
-            return data, meta
-    return [], last_meta
+    # According to swagger:
+    # /v1/reports/local-coverage-final-lcds/
+    # /v1/reports/local-coverage-articles/
+    params = build_params({
+        # The reports endpoints generally accept 'states', 'status', 'contractors'
+        # If an API ignores some keys, they will be harmlessly dropped.
+        "states": states,
+        "status": status,
+        "contractors": contractors,
+    })
+    lcds: List[Dict[str, Any]] = []
+    arts: List[Dict[str, Any]] = []
+
+    for path, sink in (
+        ("/v1/reports/local-coverage-final-lcds", lcds),
+        ("/v1/reports/local-coverage-articles", arts),
+    ):
+        status_code, payload = _get(session, path, params=params, timeout=timeout)
+        if status_code == 200 and isinstance(payload, dict):
+            data = payload.get("data", [])
+            if isinstance(data, list):
+                sink.extend(data)
+        else:
+            # Log concise server message
+            msg = short_error_text(payload)
+            print(f"[warn] reports fetch {path} returned {status_code}: {msg}")
+
+    return lcds, arts
 
 
-# -------------------------
-# Article-only endpoints
-# -------------------------
-def get_codes_table_any(ids: Mapping[str, Any], timeout: int = 30) -> List[Dict[str, Any]]:
-    # NOTE: code-table exists only for articles (SAD Exclusion code table)
-    rows, meta = _page("/data/article/code-table", possible_article_param_sets(ids), timeout=timeout)
-    _debug(f"  -> /data/article/code-table with {','.join(possible_article_param_sets(ids)[0].keys()) or '(no-params)'}: {len(rows)} rows")
+# ----------------------------
+# Data endpoint callers (Article and LCD)
+# ----------------------------
+
+def _fetch_table(
+    session: requests.Session,
+    path: str,
+    ids: Dict[str, Any],
+    id_sets: Iterable[Tuple[str, ...]],
+    timeout: Optional[int] = None,
+    label: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Try the endpoint with different identifier combinations until we get data or exhaust options.
+    """
+    label = label or path
+    rows: List[Dict[str, Any]] = []
+
+    # Try combinations of id params (order matters)
+    for combo in id_sets:
+        params = {k: ids.get(k) for k in combo if ids.get(k) is not None}
+        q = build_params(params)
+        # Log exactly which params were used
+        if q:
+            joined = ",".join(combo)
+        else:
+            joined = "(no-params)"
+        status, payload = _get(session, path, params=q, timeout=timeout)
+        page_meta = payload.get("meta", {}) if isinstance(payload, dict) else {}
+        if isinstance(page_meta, dict):
+            _debug(f"  page meta: {list(page_meta.keys())}")
+        data_part = payload.get("data", []) if isinstance(payload, dict) else []
+        n = len(data_part) if isinstance(data_part, list) else 0
+        print(f"[DEBUG]   -> {path} with {joined}: {n} rows")
+
+        if n > 0 and isinstance(data_part, list):
+            rows.extend(data_part)
+            break  # stop at first successful id combination
+
     return rows
 
 
-def get_icd10_covered_any(ids: Mapping[str, Any], timeout: int = 30) -> List[Dict[str, Any]]:
-    # Article-only
-    rows, meta = _page("/data/article/icd10-covered", possible_article_param_sets(ids), timeout=timeout)
-    _debug(f"  -> /data/article/icd10-covered with {','.join(possible_article_param_sets(ids)[0].keys()) or '(no-params)'}: {len(rows)} rows")
-    return rows
+# Valid Article data endpoints from swagger
+ARTICLE_ENDPOINTS: Tuple[str, ...] = (
+    "/v1/data/article/code-table",
+    "/v1/data/article/icd10-covered",
+    "/v1/data/article/icd10-noncovered",
+    "/v1/data/article/hcpc-code",
+    "/v1/data/article/hcpc-modifier",
+    "/v1/data/article/revenue-code",
+    "/v1/data/article/bill-codes",
+)
+
+# Valid LCD endpoints from swagger we actually need (avoid lcd/code-table which 400s)
+LCD_ENDPOINTS: Tuple[str, ...] = (
+    "/v1/data/lcd/hcpc-code",
+    # add other lcd endpoints you need that exist in swagger:
+    # "/v1/data/lcd/revision-history", etc.
+)
 
 
-def get_icd10_noncovered_any(ids: Mapping[str, Any], timeout: int = 30) -> List[Dict[str, Any]]:
-    # Article-only
-    rows, meta = _page("/data/article/icd10-noncovered", possible_article_param_sets(ids), timeout=timeout)
-    _debug(f"  -> /data/article/icd10-noncovered with {','.join(possible_article_param_sets(ids)[0].keys()) or '(no-params)'}: {len(rows)} rows")
-    return rows
-
-
-def get_hcpc_modifiers_any(ids: Mapping[str, Any], timeout: int = 30) -> List[Dict[str, Any]]:
-    # Article-only
-    rows, meta = _page("/data/article/hcpc-modifier", possible_article_param_sets(ids), timeout=timeout)
-    _debug(f"  -> /data/article/hcpc-modifier with {','.join(possible_article_param_sets(ids)[0].keys()) or '(no-params)'}: {len(rows)} rows")
-    return rows
-
-
-def get_revenue_codes_any(ids: Mapping[str, Any], timeout: int = 30) -> List[Dict[str, Any]]:
-    # Article-only
-    rows, meta = _page("/data/article/revenue-code", possible_article_param_sets(ids), timeout=timeout)
-    _debug(f"  -> /data/article/revenue-code with {','.join(possible_article_param_sets(ids)[0].keys()) or '(no-params)'}: {len(rows)} rows")
-    return rows
-
-
-def get_bill_codes_any(ids: Mapping[str, Any], timeout: int = 30) -> List[Dict[str, Any]]:
-    # Article-only
-    rows, meta = _page("/data/article/bill-codes", possible_article_param_sets(ids), timeout=timeout)
-    _debug(f"  -> /data/article/bill-codes with {','.join(possible_article_param_sets(ids)[0].keys()) or '(no-params)'}: {len(rows)} rows")
-    return rows
-
-
-# -------------------------
-# Article & LCD endpoints
-# -------------------------
-def get_hcpc_codes_any(ids: Mapping[str, Any], timeout: int = 30) -> List[Dict[str, Any]]:
-    # Try article first, then LCD
-    a_rows, a_meta = _page("/data/article/hcpc-code", possible_article_param_sets(ids), timeout=timeout)
-    if a_rows:
-        _debug(f"  -> /data/article/hcpc-code yielded {len(a_rows)} rows")
-        return a_rows
-    l_rows, l_meta = _page("/data/lcd/hcpc-code", possible_lcd_param_sets(ids), timeout=timeout)
-    _debug(f"  -> /data/lcd/hcpc-code yielded {len(l_rows)} rows")
-    return l_rows
-
-
-# -------------------------
-# Utilities for callers
-# -------------------------
-def discover_ids_from_report_row(row: Mapping[str, Any]) -> Dict[str, Any]:
+def get_article_tables(
+    session: requests.Session,
+    ids: Dict[str, Any],
+    timeout: Optional[int] = None,
+) -> Dict[str, List[Dict[str, Any]]]:
     """
-    The reports provide different fields depending on document type.
-    This function standardizes what we might pass into *any() helpers.
+    Fetch rows from the supported article data endpoints using various id combos.
     """
-    ids: Dict[str, Any] = {}
-    # Common
-    if row.get("document_id"):
-        ids["document_id"] = row["document_id"]
-    if row.get("document_display_id"):
-        ids["document_display_id"] = row["document_display_id"]
-    if row.get("document_version"):
-        ids["document_version"] = row["document_version"]
+    # try with (article/document) ids, with/without version when appropriate
+    # Ordered to reduce call volume.
+    id_combos = [
+        ("article_id", "document_version"),
+        ("article_display_id", "document_version"),
+        ("document_id", "document_version"),
+        ("document_display_id", "document_version"),
+        ("article_id",),
+        ("article_display_id",),
+        ("document_id",),
+        ("document_display_id",),
+        # some article endpoints allow lcd ids (rare), include last
+        ("lcd_id", "document_version"),
+        ("lcd_display_id", "document_version"),
+        ("lcd_id",),
+        ("lcd_display_id",),
+        tuple(),  # final "no params" probe
+    ]
 
-    # Article
-    if str(row.get("document_display_id", "")).startswith("A"):
-        if row.get("document_id"):
-            ids["article_id"] = row["document_id"]
-        if row.get("document_display_id"):
-            ids["article_display_id"] = row["document_display_id"]
+    results: Dict[str, List[Dict[str, Any]]] = {}
+    for ep in ARTICLE_ENDPOINTS:
+        rows = _fetch_table(session, ep, ids, id_combos, timeout=timeout, label="article")
+        results[ep] = rows
+    return results
 
-    # LCD
-    if str(row.get("document_display_id", "")).startswith("L"):
-        if row.get("document_id"):
-            ids["lcd_id"] = row["document_id"]
-        if row.get("document_display_id"):
-            ids["lcd_display_id"] = row["document_display_id"]
 
-    return ids
+def get_lcd_tables(
+    session: requests.Session,
+    ids: Dict[str, Any],
+    timeout: Optional[int] = None,
+) -> Dict[str, List[Dict[str, Any]]]:
+    """
+    Fetch rows from supported lcd data endpoints (skip undocumented ones).
+    """
+    id_combos = [
+        ("lcd_id", "document_version"),
+        ("lcd_display_id", "document_version"),
+        ("document_id", "document_version"),
+        ("document_display_id", "document_version"),
+        ("lcd_id",),
+        ("lcd_display_id",),
+        ("document_id",),
+        ("document_display_id",),
+        tuple(),
+    ]
+    results: Dict[str, List[Dict[str, Any]]] = {}
+    for ep in LCD_ENDPOINTS:
+        rows = _fetch_table(session, ep, ids, id_combos, timeout=timeout, label="lcd")
+        results[ep] = rows
+    return results

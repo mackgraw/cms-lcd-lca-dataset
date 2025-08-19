@@ -1,188 +1,158 @@
-#!/usr/bin/env python3
-"""
-Harvest a single pass of Coverage API data with optional filters from env vars.
-Empty or missing env vars are treated as "no filter".
-"""
-
+# scripts/run_once.py
 from __future__ import annotations
+
+import csv
 import os
-import sys
-from typing import Optional, Dict, Any, Iterable, Tuple
+from typing import Any, Dict, List, Tuple
+
+import requests
 
 from scripts.coverage_api import (
     ensure_license_acceptance,
     fetch_local_reports,
-    fetch_article_subresource_rows,
-    fetch_lcd_subresource_rows,
+    get_article_tables,
+    get_lcd_tables,
+    build_params,  # might be useful later
 )
 
-# ----------------------------
-# Env handling (empty-safe)
-# ----------------------------
 
-def _get_env(name: str, default: Optional[str] = None) -> Optional[str]:
-    """Return None if env var is missing or empty/whitespace; else the stripped value."""
-    val = os.getenv(name, None)
+def _env(name: str, default: str = "") -> str:
+    # Accept empty/whitespace strings as "unset"
+    val = os.getenv(name, default)
     if val is None:
-        return default
-    val = val.strip()
-    if val == "":
-        return None
-    return val
+        return ""
+    s = str(val)
+    return s if s.strip() else ""
 
-def _get_env_int(name: str, default: int = 0) -> int:
-    val = _get_env(name)
-    if not val:
-        return default
-    try:
-        return int(val)
-    except ValueError:
-        return default
 
-COVERAGE_STATES      = _get_env("COVERAGE_STATES")        # e.g. "FL,PA" or None
-COVERAGE_STATUS      = _get_env("COVERAGE_STATUS")        # e.g. "final|proposed|all" or None
-COVERAGE_CONTRACTORS = _get_env("COVERAGE_CONTRACTORS")   # e.g. "First Coast,Novitas" or None
-COVERAGE_MAX_DOCS    = _get_env_int("COVERAGE_MAX_DOCS", 0)     # 0 = unlimited
-COVERAGE_TIMEOUT     = _get_env_int("COVERAGE_TIMEOUT", 0)      # 0 = default
+def _echo_env():
+    print(f"[PY-ENV] COVERAGE_STATES = {os.getenv('COVERAGE_STATES','')}")
+    print(f"[PY-ENV] COVERAGE_STATUS = {os.getenv('COVERAGE_STATUS','')}")
+    print(f"[PY-ENV] COVERAGE_CONTRACTORS = {os.getenv('COVERAGE_CONTRACTORS','')}")
+    print(f"[PY-ENV] COVERAGE_MAX_DOCS = {os.getenv('COVERAGE_MAX_DOCS','')}")
+    print(f"[PY-ENV] COVERAGE_TIMEOUT = {os.getenv('COVERAGE_TIMEOUT','')}")
 
-def _env_echo():
-    print(f"[PY-ENV] COVERAGE_STATES = {COVERAGE_STATES or 'ALL'}")
-    print(f"[PY-ENV] COVERAGE_STATUS = {COVERAGE_STATUS or 'ALL'}")
-    print(f"[PY-ENV] COVERAGE_CONTRACTORS = {COVERAGE_CONTRACTORS or 'ALL'}")
-    print(f"[PY-ENV] COVERAGE_MAX_DOCS = {COVERAGE_MAX_DOCS or '∞'}")
-    print(f"[PY-ENV] COVERAGE_TIMEOUT = {COVERAGE_TIMEOUT or 'default'}")
 
-# ----------------------------
-# Small helpers
-# ----------------------------
-
-def _mkdirs():
+def _mk_dirs():
     os.makedirs(".harvest_logs", exist_ok=True)
     os.makedirs("dataset", exist_ok=True)
 
-def _maybe_split_csv(s: Optional[str]) -> Optional[Iterable[str]]:
-    """Return None (no filter) or an iterable of cleaned tokens."""
-    if not s:
-        return None
-    parts = [p.strip() for p in s.split(",")]
-    parts = [p for p in parts if p]
-    return parts or None
 
-# ----------------------------
-# Main
-# ----------------------------
+def _doc_ids_from_row(row: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Normalize IDs from report rows. Reports usually include:
+    - document_id / document_display_id
+    - document_type ('Article' or 'LCD')
+    - document_version (int/str)
+    """
+    ids: Dict[str, Any] = {}
+    # Most reports use these names:
+    ids["document_id"] = row.get("document_id")
+    ids["document_display_id"] = row.get("document_display_id")
+    ids["document_type"] = row.get("document_type")
+    ids["document_version"] = row.get("document_version")
+
+    # Helpful aliases for data endpoints:
+    if ids.get("document_type", "").lower() == "article":
+        ids["article_id"] = ids.get("document_id")
+        ids["article_display_id"] = ids.get("document_display_id")
+    elif ids.get("document_type", "").lower() == "lcd":
+        ids["lcd_id"] = ids.get("document_id")
+        ids["lcd_display_id"] = ids.get("document_display_id")
+    return ids
+
+
+def _write_csv(path: str, headers: List[str], rows: List[List[Any]]) -> None:
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(headers)
+        for r in rows:
+            w.writerow(r)
+
 
 def main() -> None:
-    _mkdirs()
-    _env_echo()
+    _mk_dirs()
+    _echo_env()
 
-    # Treat empty envs as "no filter"
-    states      = _maybe_split_csv(COVERAGE_STATES)
-    contractors = _maybe_split_csv(COVERAGE_CONTRACTORS)
-    status      = COVERAGE_STATUS or None
-    max_docs    = COVERAGE_MAX_DOCS if COVERAGE_MAX_DOCS > 0 else None
-    timeout     = COVERAGE_TIMEOUT if COVERAGE_TIMEOUT > 0 else None
+    STATES = _env("COVERAGE_STATES")
+    STATUS = _env("COVERAGE_STATUS")
+    CONTRACTORS = _env("COVERAGE_CONTRACTORS")
+    MAX_DOCS = _env("COVERAGE_MAX_DOCS")
+    TIMEOUT = _env("COVERAGE_TIMEOUT")
 
-    # 1) Accept license (no-op if not needed)
-    ensure_license_acceptance(timeout=timeout)
+    max_docs: int = int(MAX_DOCS) if MAX_DOCS.isdigit() else 0
+    timeout: int = int(TIMEOUT) if TIMEOUT.isdigit() else 30
 
-    # 2) Get local-coverage reports (articles + final LCDs) honoring filters if provided
-    reports = fetch_local_reports(
-        states=states,
-        status=status,
-        contractors=contractors,
+    sess = requests.Session()
+
+    # License call (no timeout argument in function signature)
+    ensure_license_acceptance(sess)
+
+    # Fetch local reports with optional filters (empty strings are ignored)
+    lcds, articles = fetch_local_reports(
+        sess,
+        states=STATES or None,
+        status=STATUS or None,
+        contractors=CONTRACTORS or None,
         timeout=timeout,
     )
 
-    total_lcds = len(reports.get("lcds", []))
-    total_articles = len(reports.get("articles", []))
-    print(f"[DEBUG] discovered {total_lcds} LCDs, {total_articles} Articles (total {total_lcds + total_articles})")
+    n_lcd = len(lcds)
+    n_art = len(articles)
+    print(f"[DEBUG] discovered {n_lcd} LCDs, {n_art} Articles (total {n_lcd + n_art})")
 
-    # 3) Limit if requested
-    articles = reports.get("articles", [])
-    lcds     = reports.get("lcds", [])
-
-    if max_docs:
+    # Limit number of docs if MAX_DOCS given
+    if max_docs > 0:
         articles = articles[:max_docs]
-        lcds     = lcds[:max_docs]
+        lcds = lcds[: max(0, max_docs - len(articles))]
 
-    # 4) Iterate and pull subresources
-    code_rows: list[Dict[str, Any]] = []
-    nocode_rows: list[Dict[str, Any]] = []
+    print(f"[DEBUG] processing {len(articles) + len(lcds)} documents")
 
-    def _row_id_debug(row: Dict[str, Any]) -> Tuple[Optional[int], Optional[str], Optional[int], Optional[str], Optional[int]]:
-        # Normalize common identifiers from report rows
-        return (
-            row.get("document_id"),
-            row.get("document_display_id"),
-            row.get("article_id") or row.get("lcd_id"),
-            row.get("article_display_id") or row.get("lcd_display_id"),
-            row.get("document_version"),
-        )
+    # We’ll aggregate “codes” vs “no-codes” rows simply based on whether any endpoint returned rows
+    code_rows: List[List[Any]] = []
+    nocode_rows: List[List[Any]] = []
 
-    # Articles
+    # Process articles
     for idx, row in enumerate(articles, start=1):
-        doc_id, doc_disp, art_or_lcd_id, art_or_lcd_disp, version = _row_id_debug(row)
-        print(f"[DEBUG] [Article {idx}/{len(articles)}] {row.get('title','')}  id={art_or_lcd_id}  display={art_or_lcd_disp}")
-        rows = fetch_article_subresource_rows(
-            # Pass all we know; API client will auto-drop Nones/empties.
-            article_id=row.get("article_id"),
-            article_display_id=row.get("article_display_id"),
-            document_id=row.get("document_id"),
-            document_display_id=row.get("document_display_id"),
-            document_version=row.get("document_version"),
-            timeout=timeout,
-        )
-        if rows:
-            code_rows.extend(rows)
-        else:
-            nocode_rows.append(row)
+        doc_id = row.get("document_display_id") or row.get("document_id") or "?"
+        print(f"[DEBUG] [Article {idx}/{len(articles)}] {doc_id}")
+        ids = _doc_ids_from_row(row)
+        tables = get_article_tables(sess, ids, timeout=timeout)
 
-    # LCDs
+        # If any endpoint had rows, we’ll consider this a “code row present”
+        total = sum(len(v) for v in tables.values())
+        if total > 0:
+            code_rows.append([ids.get("article_display_id") or ids.get("document_display_id") or "",
+                              ids.get("article_id") or ids.get("document_id") or "",
+                              ids.get("document_version") or ""])
+        else:
+            nocode_rows.append([ids.get("article_display_id") or ids.get("document_display_id") or "",
+                                ids.get("article_id") or ids.get("document_id") or "",
+                                ids.get("document_version") or ""])
+
+    # Process LCDs (only endpoints we know are valid in swagger)
     for idx, row in enumerate(lcds, start=1):
-        print(f"[DEBUG] [LCD {idx}/{len(lcds)}] {row.get('title','')}  id={row.get('lcd_id')}  display={row.get('lcd_display_id')}")
-        rows = fetch_lcd_subresource_rows(
-            lcd_id=row.get("lcd_id"),
-            lcd_display_id=row.get("lcd_display_id"),
-            document_id=row.get("document_id"),
-            document_display_id=row.get("document_display_id"),
-            document_version=row.get("document_version"),
-            timeout=timeout,
-        )
-        if rows:
-            code_rows.extend(rows)
+        doc_id = row.get("document_display_id") or row.get("document_id") or "?"
+        print(f"[DEBUG] [LCD {idx}/{len(lcds)}] {doc_id}")
+        ids = _doc_ids_from_row(row)
+        tables = get_lcd_tables(sess, ids, timeout=timeout)
+        total = sum(len(v) for v in tables.values())
+        if total > 0:
+            code_rows.append([ids.get("lcd_display_id") or ids.get("document_display_id") or "",
+                              ids.get("lcd_id") or ids.get("document_id") or "",
+                              ids.get("document_version") or ""])
         else:
-            nocode_rows.append(row)
+            nocode_rows.append([ids.get("lcd_display_id") or ids.get("document_display_id") or "",
+                                ids.get("lcd_id") or ids.get("document_id") or "",
+                                ids.get("document_version") or ""])
 
-    # 5) Write outputs
-    import csv
-
-    codes_csv = "dataset/document_codes_latest.csv"
-    nocodes_csv = "dataset/document_nocodes_latest.csv"
-
-    # Write codes
-    with open(codes_csv, "w", newline="", encoding="utf-8") as f:
-        if code_rows:
-            fieldnames = sorted({k for r in code_rows for k in r.keys()})
-        else:
-            fieldnames = ["document_id", "document_display_id", "note"]  # minimal header
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        for r in code_rows:
-            writer.writerow(r)
-    print(f"[note] Wrote {len(code_rows)} code rows to {codes_csv}")
-
-    # Write no-codes
-    with open(nocodes_csv, "w", newline="", encoding="utf-8") as f:
-        if nocode_rows:
-            fieldnames = sorted({k for r in nocode_rows for k in r.keys()})
-        else:
-            fieldnames = ["document_id", "document_display_id", "note"]
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        for r in nocode_rows:
-            writer.writerow(r)
-    print(f"[note] Wrote {len(nocode_rows)} no-code rows to {nocodes_csv}")
+    # Always write both CSVs so artifacts step doesn’t fail
+    codes_path = "dataset/document_codes_latest.csv"
+    nocodes_path = "dataset/document_nocodes_latest.csv"
+    _write_csv(codes_path, ["display_id", "id", "version"], code_rows)
+    _write_csv(nocodes_path, ["display_id", "id", "version"], nocode_rows)
+    print(f"[note] Wrote {len(code_rows)} code rows to {codes_path}")
+    print(f"[note] Wrote {len(nocode_rows)} no-code rows to {nocodes_path}")
 
 
 if __name__ == "__main__":
