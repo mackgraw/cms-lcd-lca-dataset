@@ -31,12 +31,27 @@ def _env(name: str, default: str = "") -> str:
     print(f"[PY-ENV] {name:<16}= {v}", flush=True)
     return v or default
 
-def _mk_ids(row: Mapping[str, Any]) -> Dict[str, Any]:
-    return {
-        "article_id": row.get("article_id"),
-        "document_id": row.get("id") or row.get("document_id"),
-        "document_display_id": row.get("display_id") or row.get("document_display_id"),
-    }
+def _mk_ids(kind: str, row: Mapping[str, Any]) -> Dict[str, Any]:
+    """
+    Normalize identifiers for the current item.
+    Articles: id -> article_id, display_id -> article_display_id
+    LCDs:     id -> document_id, display_id -> document_display_id
+    """
+    if kind == "Article":
+        return {
+            "article_id": row.get("article_id") or row.get("id"),
+            "article_display_id": row.get("article_display_id") or row.get("display_id"),
+            # keep lcd keys empty for clarity
+            "document_id": None,
+            "document_display_id": None,
+        }
+    else:  # "LCD"
+        return {
+            "document_id": row.get("document_id") or row.get("id"),
+            "document_display_id": row.get("document_display_id") or row.get("display_id"),
+            "article_id": None,
+            "article_display_id": None,
+        }
 
 def _mk_label(row: Mapping[str, Any]) -> str:
     title = row.get("title") or row.get("name") or row.get("display_name") or ""
@@ -62,25 +77,15 @@ def _collect_for_ids(kind: str, ids: Mapping[str, Any], timeout: int) -> List[Di
             r["_endpoint"] = endpoint
             rows.append(r)
 
-    if kind == "Article":
-        tag_and_extend("code-table",       get_codes_table_any)
-        tag_and_extend("icd10-covered",    get_icd10_covered_any)
-        tag_and_extend("icd10-noncovered", get_icd10_noncovered_any)
-        tag_and_extend("hcpc-code",        get_hcpc_codes_any)
-        tag_and_extend("hcpc-modifier",    get_hcpc_modifiers_any)
-        tag_and_extend("revenue-code",     get_revenue_codes_any)
-        tag_and_extend("bill-codes",       get_bill_types_any)
-    elif kind == "LCD":
-        # LCD versions of the above; reuse the same helpers which route by ids
-        tag_and_extend("code-table",       get_codes_table_any)
-        tag_and_extend("icd10-covered",    get_icd10_covered_any)
-        tag_and_extend("icd10-noncovered", get_icd10_noncovered_any)
-        tag_and_extend("hcpc-code",        get_hcpc_codes_any)
-        tag_and_extend("hcpc-modifier",    get_hcpc_modifiers_any)
-        tag_and_extend("revenue-code",     get_revenue_codes_any)
-        tag_and_extend("bill-codes",       get_bill_types_any)
-    else:
-        _debug(f"[DEBUG]   -> unknown kind {kind!r}; skipping")
+    # Using helpers that choose Article-first, then LCD, but we call them once per family
+    tag_and_extend("code-table",       get_codes_table_any)
+    tag_and_extend("icd10-covered",    get_icd10_covered_any)
+    tag_and_extend("icd10-noncovered", get_icd10_noncovered_any)
+    tag_and_extend("hcpc-code",        get_hcpc_codes_any)
+    tag_and_extend("hcpc-modifier",    get_hcpc_modifiers_any)
+    tag_and_extend("revenue-code",     get_revenue_codes_any)
+    tag_and_extend("bill-codes",       get_bill_types_any)
+
     return rows
 
 def _write_csv(path: str, rows: List[Dict[str, Any]]) -> None:
@@ -127,10 +132,16 @@ def _load_manifest(path: str) -> List[str]:
         raise FileNotFoundError(f"Manifest not found: {p}")
     return [ln.strip() for ln in p.read_text(encoding="utf-8").splitlines() if ln.strip()]
 
-def _id_keys(row: Mapping[str, Any]) -> List[str]:
+def _id_keys(kind: str, row: Mapping[str, Any]) -> List[str]:
     """All comparable identifiers for a row, coerced to strings."""
-    ids = _mk_ids(row)
-    vals = [ids.get("document_id"), ids.get("document_display_id"), ids.get("article_id")]
+    ids = _mk_ids(kind, row)
+    # compare against both article_* and document_* for convenience
+    vals = [
+        ids.get("document_id"),
+        ids.get("document_display_id"),
+        ids.get("article_id"),
+        ids.get("article_display_id"),
+    ]
     return [str(v) for v in vals if v not in (None, "")]
 
 def _select_work(work: List[Tuple[str, Dict[str, Any]]], allow_ids: Optional[set[str]]) -> List[Tuple[str, Dict[str, Any]]]:
@@ -138,8 +149,8 @@ def _select_work(work: List[Tuple[str, Dict[str, Any]]], allow_ids: Optional[set
         return work
     selected = []
     for item in work:
-        _, row = item
-        keys = _id_keys(row)
+        kind, row = item
+        keys = _id_keys(kind, row)
         if any(k in allow_ids for k in keys):
             selected.append(item)
     return selected
@@ -151,8 +162,8 @@ def _shard_filter(work: List[Tuple[str, Dict[str, Any]]], shard_index: int, shar
         return work
     out: List[Tuple[str, Dict[str, Any]]] = []
     for item in work:
-        _, row = item
-        keys = _id_keys(row)
+        kind, row = item
+        keys = _id_keys(kind, row)
         # prefer display id -> document id -> article id
         key = (keys[0] if keys else "")
         h = hashlib.md5(key.encode("utf-8")).hexdigest()
@@ -217,7 +228,7 @@ def main() -> None:
     for idx, (kind, row) in enumerate(work, start=1):
         label = _mk_label(row)
         _debug(f"[DEBUG] [{kind} {idx}/{len(work)}] {label}")
-        ids = _mk_ids(row)
+        ids = _mk_ids(kind, row)
 
         try:
             got = _collect_for_ids(kind, ids, TIMEOUT)
@@ -227,8 +238,9 @@ def main() -> None:
 
         if got:
             for r in got:
-                r["_document_display_id"] = ids.get("document_display_id")
-                r["_document_id"]        = ids.get("document_id")
+                # Populate _document_* columns with whichever ID set we have for easy downstream use
+                r["_document_display_id"] = ids.get("document_display_id") or ids.get("article_display_id")
+                r["_document_id"]        = ids.get("document_id") or ids.get("article_id")
                 r["_kind"]               = kind
                 r["_title"]              = row.get("title") or row.get("name") or ""
             _debug(f"        -> aggregated rows: {len(got)}")
@@ -237,8 +249,8 @@ def main() -> None:
             _debug(f"        -> aggregated rows: 0")
             no_code_rows.append({
                 "_kind": kind,
-                "_document_id": ids.get("document_id") or "",
-                "_document_display_id": ids.get("document_display_id") or "",
+                "_document_id": ids.get("document_id") or ids.get("article_id") or "",
+                "_document_display_id": (ids.get("document_display_id") or ids.get("article_display_id") or ""),
                 "_title": row.get("title") or row.get("name") or "",
             })
 
