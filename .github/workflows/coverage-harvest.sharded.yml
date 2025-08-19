@@ -5,14 +5,21 @@ on:
   schedule:
     - cron: "0 7 * * *"   # Daily at 07:00 UTC (~03:00 AM ET)
 
+# Prevent overlapping runs of this workflow (keeps logs/results cleaner)
+concurrency:
+  group: coverage-harvest-sharded
+  cancel-in-progress: false
+
 jobs:
   harvest:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
+      # If needed, limit how many shards run simultaneously:
+      # max-parallel: 8
       matrix:
-        shard: [0, 1, 2, 3]   # adjust to control parallelism (e.g., 8 or 12)
-        total: [4]
+        shard: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
+        total: [16]
 
     steps:
       - name: Checkout
@@ -27,36 +34,24 @@ jobs:
             requirements.txt
             **/requirements.txt
 
-
-      - name: Cache pip
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: ${{ runner.os }}-pip-
-
       - name: Install dependencies
         if: hashFiles('requirements.txt') != ''
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Ensure git available
-        run: |
-          git --version || (sudo apt-get update && sudo apt-get install -y git)
-          git ls-files | wc -l
-
       - name: Run shard ${{ matrix.shard }}/${{ matrix.total }}
         env:
           SHARD_INDEX: ${{ matrix.shard }}
           SHARD_TOTAL: ${{ matrix.total }}
-           # (optional) SHARD_BATCH_SIZE, COVERAGE_MAX_DOCS, etc.
+          # Optional: cap work per job if a shard still approaches 6h
+          # COVERAGE_MAX_DOCS: "1200"
         run: |
           mkdir -p .harvest_logs
           python -m scripts.run_once 2>&1 | tee .harvest_logs/shard-${{ matrix.shard }}.log
           test ${PIPESTATUS[0]} -eq 0
 
-      - name: Upload artifact (per-shard logs)
+      - name: Upload shard log
         if: always()
         uses: actions/upload-artifact@v4
         with:
