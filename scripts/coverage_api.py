@@ -39,16 +39,18 @@ def _get(path: str, params: Optional[Mapping[str, Any]], timeout: int) -> Dict[s
         r.raise_for_status()
     except requests.HTTPError as e:
         msg = ""
+        keys: List[str] = []
         try:
             j = r.json()
             msg = str(j.get("message", "") or j.get("error", "")).strip()
             keys = list(j.keys())
         except Exception:
-            keys = []
-        _debug(f"[DEBUG] GET {full} -> {r.status_code}; keys={keys}; message={msg!r}")
+            pass
+        snippet = (msg[:120] + ("…" if len(msg) > 120 else "")) if msg else ""
+        _debug(f"[DEBUG] GET {full} -> {r.status_code}; keys={keys}; message={snippet!r}")
         detail = f"{r.status_code} for {full}"
-        if msg:
-            detail += f" — {msg}"
+        if snippet:
+            detail += f" — {snippet}"
         raise _HTTPError(detail) from e
     j = r.json()
     try:
@@ -58,7 +60,7 @@ def _get(path: str, params: Optional[Mapping[str, Any]], timeout: int) -> Dict[s
     _debug(f"[DEBUG] GET {full} -> {r.status_code}; keys={keys}")
     return j
 
-# ---- license agreement -------------------------------------------------------
+# ----- license acceptance -----------------------------------------------------
 
 def ensure_license_acceptance(timeout: int = 30) -> None:
     existing = os.environ.get("COVERAGE_LICENSE_TOKEN", "").strip()
@@ -87,7 +89,7 @@ def ensure_license_acceptance(timeout: int = 30) -> None:
     else:
         print("[note] CMS license agreement acknowledged (no token provided).", flush=True)
 
-# ---- discovery ---------------------------------------------------------------
+# ----- discovery (unchanged) -------------------------------------------------
 
 def _paged_report(path: str, timeout: int, params: Optional[Mapping[str, Any]] = None) -> List[Dict[str, Any]]:
     payload = _get(path, params, timeout)
@@ -115,32 +117,32 @@ def list_articles(states: str, status: str, contractors: str, timeout: int) -> L
     _debug("[DEBUG] trying /reports/local-coverage-articles" + ("" if status else " (no status)"))
     return _paged_report("/reports/local-coverage-articles", timeout, params)
 
-# ---- parameter builders & family detection ----------------------------------
+# ----- family detection & param builders -------------------------------------
 
 def _is_article_ids(ids: Mapping[str, Any]) -> bool:
     return bool(ids.get("article_id") or ids.get("article_display_id"))
 
 def _is_lcd_ids(ids: Mapping[str, Any]) -> bool:
-    return bool(ids.get("document_id") or ids.get("document_display_id"))
+    return bool(ids.get("lcd_id") or ids.get("lcd_display_id"))
 
 def _article_param_sets(ids: Mapping[str, Any]) -> List[Dict[str, Any]]:
     out: List[Dict[str, Any]] = []
-    article_id = ids.get("article_id") or ids.get("id") or ids.get("document_id")
-    if article_id not in (None, "", 0):
-        out.append({"article_id": article_id})
-    display = ids.get("article_display_id") or ids.get("display_id") or ids.get("document_display_id")
-    if display:
-        out.append({"article_display_id": str(display)})
+    a_id   = ids.get("article_id")
+    a_disp = ids.get("article_display_id")
+    if a_id:
+        out.append({"article_id": a_id})
+    if a_disp:
+        out.append({"article_display_id": a_disp})
     return out or [{}]
 
 def _lcd_param_sets(ids: Mapping[str, Any]) -> List[Dict[str, Any]]:
     out: List[Dict[str, Any]] = []
-    document_id = ids.get("document_id") or ids.get("id") or ids.get("article_id")
-    if document_id not in (None, "", 0):
-        out.append({"document_id": document_id})
-    display = ids.get("document_display_id") or ids.get("display_id") or ids.get("article_display_id")
-    if display:
-        out.append({"document_display_id": str(display)})
+    l_id   = ids.get("lcd_id") or ids.get("document_id") or ids.get("id")
+    l_disp = ids.get("lcd_display_id") or ids.get("document_display_id") or ids.get("display_id")
+    if l_id:
+        out.append({"lcd_id": l_id})
+    if l_disp:
+        out.append({"lcd_display_id": l_disp})
     return out or [{}]
 
 def _try_one(path: str, param_sets: Iterable[Mapping[str, Any]], timeout: int) -> List[Dict[str, Any]]:
@@ -148,55 +150,56 @@ def _try_one(path: str, param_sets: Iterable[Mapping[str, Any]], timeout: int) -
         try:
             payload = _get(path, params, timeout)
         except RetryError as e:
-            _debug(f"[DEBUG]   -> {path} with {','.join(params.keys())}: {e} (continue)")
+            _debug(f"[DEBUG]   -> {path} with {','.join(params.keys()) or '∅'}: {e} (continue)")
             continue
         except _HTTPError as e:
-            _debug(f"[DEBUG]   -> {path} with {','.join(params.keys())}: {e} (continue)")
+            _debug(f"[DEBUG]   -> {path} with {','.join(params.keys()) or '∅'}: {e} (continue)")
             continue
         meta = payload.get("meta") or {}
         data = payload.get("data") or []
         if isinstance(data, list) and data:
             return data
         _debug(f"[DEBUG]   page meta: {list(meta.keys()) or []}")
-        _debug(f"[DEBUG]   -> {path} with {','.join(params.keys())}: {len(data)} rows")
+        _debug(f"[DEBUG]   -> {path} with {','.join(params.keys()) or '∅'}: {len(data)} rows")
     return []
 
-# ---- LCD detail (optional sanity) -------------------------------------------
-
-def get_final_lcd_any(ids: Mapping[str, Any], timeout: int) -> Dict[str, Any]:
-    params = next(iter(_lcd_param_sets(ids)), {})
-    return _get("/data/final-lcd", params or None, timeout)
-
-# ---- harvesting: respect family hint; otherwise fall back -------------------
-
 def _family_routed(article_path: str, lcd_path: str, ids: Mapping[str, Any], timeout: int) -> List[Dict[str, Any]]:
+    # Prefer the family suggested by the ids we were given.
     if _is_article_ids(ids):
         return _try_one(article_path, _article_param_sets(ids), timeout)
     if _is_lcd_ids(ids):
         return _try_one(lcd_path, _lcd_param_sets(ids), timeout)
-    # If ambiguous, try article first then LCD (rare once run_once passes kind-aware ids)
+    # Ambiguous? Try Article first, then LCD.
     rows = _try_one(article_path, _article_param_sets(ids), timeout)
     if rows:
         return rows
     return _try_one(lcd_path, _lcd_param_sets(ids), timeout)
 
+# ----- LCD detail (if needed elsewhere) --------------------------------------
+
+def get_final_lcd_any(ids: Mapping[str, Any], timeout: int) -> Dict[str, Any]:
+    params = next(iter(_lcd_param_sets(ids)), {})
+    return _get("/data/lcd", params or None, timeout)
+
+# ----- harvesting families (correct paths) -----------------------------------
+
 def get_codes_table_any(ids: Mapping[str, Any], timeout: int) -> List[Dict[str, Any]]:
-    return _family_routed("/data/article/code-table", "/data/final-lcd/code-table", ids, timeout)
+    return _family_routed("/data/article/code-table", "/data/lcd/code-table", ids, timeout)
 
 def get_icd10_covered_any(ids: Mapping[str, Any], timeout: int) -> List[Dict[str, Any]]:
-    return _family_routed("/data/article/icd10-covered", "/data/final-lcd/icd10-covered", ids, timeout)
+    return _family_routed("/data/article/icd10-covered", "/data/lcd/icd10-covered", ids, timeout)
 
 def get_icd10_noncovered_any(ids: Mapping[str, Any], timeout: int) -> List[Dict[str, Any]]:
-    return _family_routed("/data/article/icd10-noncovered", "/data/final-lcd/icd10-noncovered", ids, timeout)
+    return _family_routed("/data/article/icd10-noncovered", "/data/lcd/icd10-noncovered", ids, timeout)
 
 def get_hcpc_codes_any(ids: Mapping[str, Any], timeout: int) -> List[Dict[str, Any]]:
-    return _family_routed("/data/article/hcpc-code", "/data/final-lcd/hcpc-code", ids, timeout)
+    return _family_routed("/data/article/hcpc-code", "/data/lcd/hcpc-code", ids, timeout)
 
 def get_hcpc_modifiers_any(ids: Mapping[str, Any], timeout: int) -> List[Dict[str, Any]]:
-    return _family_routed("/data/article/hcpc-modifier", "/data/final-lcd/hcpc-modifier", ids, timeout)
+    return _family_routed("/data/article/hcpc-modifier", "/data/lcd/hcpc-modifier", ids, timeout)
 
 def get_revenue_codes_any(ids: Mapping[str, Any], timeout: int) -> List[Dict[str, Any]]:
-    return _family_routed("/data/article/revenue-code", "/data/final-lcd/revenue-code", ids, timeout)
+    return _family_routed("/data/article/revenue-code", "/data/lcd/revenue-code", ids, timeout)
 
 def get_bill_types_any(ids: Mapping[str, Any], timeout: int) -> List[Dict[str, Any]]:
-    return _family_routed("/data/article/bill-codes", "/data/final-lcd/bill-codes", ids, timeout)
+    return _family_routed("/data/article/bill-codes", "/data/lcd/bill-codes", ids, timeout)

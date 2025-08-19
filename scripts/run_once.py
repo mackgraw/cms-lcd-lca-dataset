@@ -30,31 +30,42 @@ def _env(name: str, default: str = "") -> str:
     print(f"[PY-ENV] {name:<16}= {v}", flush=True)
     return v or default
 
+def _coalesce(*vals):
+    for v in vals:
+        if v not in (None, "", 0):
+            return v
+    return None
+
 def _mk_ids(kind: str, row: Mapping[str, Any]) -> Dict[str, Any]:
     """
-    Articles: expose article_id + article_display_id (e.g., A59636)
-    LCDs:     expose document_id + document_display_id (e.g., L35000)
+    Build the canonical ID dict we pass to API calls.
+
+    Articles -> article_id / article_display_id (e.g., 59636 / A59636)
+    LCDs     -> lcd_id     / lcd_display_id     (e.g., 36402 / L36402)
+
+    We’re liberal in which input keys we accept from discovery.
     """
     if kind == "Article":
         return {
-            "article_id": row.get("article_id") or row.get("id"),
-            "article_display_id": row.get("article_display_id") or row.get("display_id"),
+            "article_id": _coalesce(row.get("article_id"), row.get("id"), row.get("document_id")),
+            "article_display_id": _coalesce(row.get("article_display_id"), row.get("display_id"), row.get("document_display_id")),
         }
-    else:
+    else:  # LCD
         return {
-            "document_id": row.get("document_id") or row.get("id"),
-            "document_display_id": row.get("document_display_id") or row.get("display_id"),
+            "lcd_id": _coalesce(row.get("lcd_id"), row.get("document_id"), row.get("id"), row.get("article_id")),
+            "lcd_display_id": _coalesce(row.get("lcd_display_id"), row.get("document_display_id"), row.get("display_id"), row.get("article_display_id")),
         }
 
 def _mk_label(row: Mapping[str, Any]) -> str:
-    title = row.get("title") or row.get("name") or row.get("display_name") or ""
-    disp  = row.get("display_id") or row.get("document_display_id") or ""
-    rid   = row.get("article_id") or row.get("id") or row.get("document_id") or ""
+    title = row.get("title") or row.get("name") or row.get("lcd_title") or row.get("display_name") or ""
+    disp  = row.get("display_id") or row.get("document_display_id") or row.get("lcd_display_id") or row.get("article_display_id") or ""
+    rid   = row.get("id") or row.get("document_id") or row.get("lcd_id") or row.get("article_id") or ""
     return f"{title or '?'}  id={rid}  display={disp}"
 
 def _collect_for_ids(kind: str, ids: Mapping[str, Any], timeout: int) -> List[Dict[str, Any]]:
     """
-    Call family-specific helpers (which now respect the family hint embedded in ids).
+    Call the harvesting families; coverage_api will route to the proper
+    Article vs LCD endpoints based on the ids we pass.
     """
     rows: List[Dict[str, Any]] = []
 
@@ -122,8 +133,8 @@ def _load_manifest(path: str) -> List[str]:
 def _id_keys(kind: str, row: Mapping[str, Any]) -> List[str]:
     ids = _mk_ids(kind, row)
     vals = [
-        ids.get("document_id"),
-        ids.get("document_display_id"),
+        ids.get("lcd_id"),
+        ids.get("lcd_display_id"),
         ids.get("article_id"),
         ids.get("article_display_id"),
     ]
@@ -172,6 +183,7 @@ def main() -> None:
     arts = list_articles(STATES, STATUS, CONTRACTORS, timeout=TIMEOUT)
     _debug(f"[DEBUG] discovered {len(lcds)} LCDs, {len(arts)} Articles (total {len(lcds)+len(arts)})")
 
+    # Process Articles first (their codes tables are usually richer), then LCDs
     work: List[Tuple[str, Dict[str, Any]]] = [("Article", a) for a in arts] + [("LCD", l) for l in lcds]
 
     allow_ids: Optional[set[str]] = None
@@ -200,7 +212,9 @@ def main() -> None:
     for idx, (kind, row) in enumerate(work, start=1):
         _debug(f"[DEBUG] [{kind} {idx}/{len(work)}] {_mk_label(row)}")
         ids = _mk_ids(kind, row)
-        _debug(f"[DEBUG]   ids for {kind}: {{ {', '.join(f'{k}={v}' for k,v in ids.items() if v)} }}")
+        # Helpful logging: what keys did discovery give us, and which IDs will we use?
+        _debug(f"[DEBUG]   row keys: {sorted(list(row.keys()))[:12]}{' ...' if len(row.keys())>12 else ''}")
+        _debug(f"[DEBUG]   ids for {kind}: {{ " + ", ".join(f"{k}={v}" for k,v in ids.items() if v not in (None, '', 0)) + " }}")
 
         try:
             got = _collect_for_ids(kind, ids, TIMEOUT)
@@ -210,19 +224,19 @@ def main() -> None:
 
         if got:
             for r in got:
-                r["_document_display_id"] = ids.get("document_display_id") or ids.get("article_display_id")
-                r["_document_id"]        = ids.get("document_id") or ids.get("article_id")
+                r["_document_display_id"] = ids.get("lcd_display_id") or ids.get("article_display_id")
+                r["_document_id"]        = ids.get("lcd_id") or ids.get("article_id")
                 r["_kind"]               = kind
-                r["_title"]              = row.get("title") or row.get("name") or ""
+                r["_title"]              = row.get("title") or row.get("name") or row.get("lcd_title") or ""
             _debug(f"        -> aggregated rows: {len(got)}")
             all_rows.extend(got)
         else:
-            _debug(f"        -> aggregated rows: 0")
+            _debug("        -> aggregated rows: 0")
             no_code_rows.append({
                 "_kind": kind,
-                "_document_id": ids.get("document_id") or ids.get("article_id") or "",
-                "_document_display_id": (ids.get("document_display_id") or ids.get("article_display_id") or ""),
-                "_title": row.get("title") or row.get("name") or "",
+                "_document_id": ids.get("lcd_id") or ids.get("article_id") or "",
+                "_document_display_id": (ids.get("lcd_display_id") or ids.get("article_display_id") or ""),
+                "_title": row.get("title") or row.get("name") or row.get("lcd_title") or "",
             })
         processed += 1
 
