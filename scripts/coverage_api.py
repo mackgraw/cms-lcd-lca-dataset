@@ -127,36 +127,59 @@ def list_articles(states: str, status: str, contractors: str, timeout: int) -> L
 
 def _article_param_sets(ids: Mapping[str, Any]) -> List[Dict[str, Any]]:
     """
-    Build query params for Article endpoints:
+    Accept IDs under multiple keys and canonicalize to:
       - article_id
-      - article_display_id  (e.g., A58017)
-    We accept upstream ids under various keys and remap as needed.
+      - article_display_id (e.g., A58017)
     """
     out: List[Dict[str, Any]] = []
-    # Common sources from discovery or caller:
-    article_id = ids.get("article_id") or ids.get("id")
-    display = ids.get("document_display_id") or ids.get("display_id") or ids.get("article_display_id")
-    if article_id:
+
+    # Numeric ID can arrive under a few names
+    article_id = (
+        ids.get("article_id")
+        or ids.get("id")
+        or ids.get("document_id")
+    )
+    if article_id not in (None, "", 0):
         out.append({"article_id": article_id})
-    # Only add display id if it looks like an article (usually "Axxxxx")
-    if display and str(display).upper().startswith("A"):
-        out.append({"article_display_id": display})
+
+    # Display ID can arrive under various names
+    display = (
+        ids.get("article_display_id")
+        or ids.get("display_id")
+        or ids.get("document_display_id")
+    )
+    if display:
+        out.append({"article_display_id": str(display)})
+
     return out or [{}]
+
 
 def _lcd_param_sets(ids: Mapping[str, Any]) -> List[Dict[str, Any]]:
     """
-    Build query params for LCD endpoints:
+    Canonicalize to:
       - document_id
-      - document_display_id (usually Lxxxxx)
+      - document_display_id (e.g., L35000)
     """
     out: List[Dict[str, Any]] = []
-    did = ids.get("document_id") or ids.get("id")
-    display = ids.get("document_display_id") or ids.get("display_id")
-    if did:
-        out.append({"document_id": did})
-    if display and str(display).upper().startswith("L"):
-        out.append({"document_display_id": display})
+
+    document_id = (
+        ids.get("document_id")
+        or ids.get("id")
+        or ids.get("article_id")  # be liberal: if someone passed numeric under article_id
+    )
+    if document_id not in (None, "", 0):
+        out.append({"document_id": document_id})
+
+    display = (
+        ids.get("document_display_id")
+        or ids.get("display_id")
+        or ids.get("article_display_id")
+    )
+    if display:
+        out.append({"document_display_id": str(display)})
+
     return out or [{}]
+
 
 def _try_one(path: str, param_sets: Iterable[Mapping[str, Any]], timeout: int) -> List[Dict[str, Any]]:
     for params in param_sets:
