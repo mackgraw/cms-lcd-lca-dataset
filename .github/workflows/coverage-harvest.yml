@@ -1,8 +1,12 @@
 name: Coverage Harvest
 
 on:
-  # Manual run with knobs you can tweak from the UI
-  workflow_dispatch:
+  
+  workflow_dispatch: {}
+    schedule:
+    # 7:00 UTC daily (≈3:00 AM America/New_York while on EDT)
+     - cron: "0 7 * * *"
+    # Manual run with knobs you can tweak from the UI
     inputs:
       states:
         description: 'Filter by states (comma-separated, optional)'
@@ -35,7 +39,10 @@ on:
 jobs:
   harvest:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 1000
+    # OPTION A: remove this line to use the default 6h limit
+    # OPTION B: or set something higher, e.g. 360 = 6 hours
+    # timeout-minutes: 360
 
     steps:
       - name: Checkout
@@ -73,9 +80,10 @@ jobs:
           path: dataset/document_codes_latest.csv
           if-no-files-found: error
 
-      - name: Upload no-codes CSV (audit)
+      - name: Upload document_nocodes_latest.csv (if exists)
+        if: ${{ hashFiles('dataset/document_nocodes_latest.csv') != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: document_nocodes_latest
           path: dataset/document_nocodes_latest.csv
-          if-no-files-found: error
+        

@@ -1,101 +1,258 @@
 # scripts/run_once.py
 from __future__ import annotations
 
+import csv
+import io
 import os
 import sys
-import logging
+import zipfile
+from pathlib import Path
+from typing import Any, Dict, List, Mapping, Optional, Tuple
+
+# NOTE: these functions are expected in scripts.coverage_api per your repo
 from scripts.coverage_api import (
-    get_article,
-    get_article_hcpc_code,
+    ensure_license_acceptance,
+    list_final_lcds,
+    list_articles,
     get_codes_table_any,
-    get_icd10_any,
-    get_lcd,
-    get_lcd_hcpc_code,
-    get_lcd_hcpc_code_group,
-    get_lcd_contractor,
-    get_lcd_revision_history,
-    get_lcd_primary_jurisdiction,
-    ApiError,
+    get_icd10_covered_any,
+    get_icd10_noncovered_any,
+    get_hcpc_codes_any,
+    get_hcpc_modifiers_any,
+    get_revenue_codes_any,
+    get_bill_types_any,
 )
 
-logging.basicConfig(
-    level=logging.DEBUG if os.environ.get("DEBUG") else logging.INFO,
-    format="%(levelname)s %(message)s",
-)
-log = logging.getLogger(__name__)
+OUT_DIR = Path("dataset")
+OUT_DIR.mkdir(parents=True, exist_ok=True)
 
+CODES_ZIP = OUT_DIR / "document_codes_latest.zip"
+CODES_CSV_NAME_IN_ZIP = "document_codes_latest.csv"
+NOCODES_CSV = OUT_DIR / "document_nocodes_latest.csv"
 
-def process_article(article_id: str, ver: str | None = None) -> None:
-    log.debug(f"[Article] {article_id} ver={ver or 'latest'}")
-    core = get_article(article_id, ver)
-    log.debug(f"  article core: {len(core.get('data', []))} rows")
+# ---------- util logging ----------
 
-    hcpcs = get_article_hcpc_code(article_id, ver)
-    log.debug(f"  article hcpc-code: {len(hcpcs.get('data', []))} rows")
+def _env(name: str, default: str = "") -> str:
+    val = os.environ.get(name, "")
+    print(f"[PY-ENV] {name} = {val}", flush=True)
+    return val or default
 
-    codes_tbl = get_codes_table_any("article", article_id, ver)
-    log.debug(f"  article code-table: {len(codes_tbl.get('data', []))} rows")
+def _debug(msg: str) -> None:
+    print(msg, flush=True)
 
-    icd10 = get_icd10_any("article", article_id, ver)
-    log.debug(
-        "  article icd10: covered=%d noncovered=%d pcs=%d",
-        len(icd10["data"]["covered"]),
-        len(icd10["data"]["noncovered"]),
-        len(icd10["data"]["pcs"]),
-    )
+def _ids_from_row(row: Mapping[str, Any]) -> Dict[str, Any]:
+    """
+    Normalize the id fields we’ve seen in the report rows to parameters
+    our coverage_api helpers understand.
+    """
+    ids: Dict[str, Any] = {}
+    # Articles
+    if "document_type" in row and str(row.get("document_type", "")).lower() == "article":
+        if "document_id" in row and row["document_id"]:
+            ids["article_id"] = row["document_id"]
+            ids["document_id"] = row["document_id"]
+        if "document_display_id" in row and row["document_display_id"]:
+            ids["article_display_id"] = row["document_display_id"]
+            ids["document_display_id"] = row["document_display_id"]
+    # LCDs
+    if "document_type" in row and "lcd" in str(row.get("document_type", "")).lower():
+        if "document_id" in row and row["document_id"]:
+            ids["lcd_id"] = row["document_id"]
+            ids["document_id"] = row["document_id"]
+        if "document_display_id" in row and row["document_display_id"]:
+            ids["lcd_display_id"] = row["document_display_id"]
+            ids["document_display_id"] = row["document_display_id"]
 
+    # Also carry version if present
+    if "document_version" in row and row["document_version"] not in (None, ""):
+        ids["document_version"] = row["document_version"]
 
-def process_lcd(lcdid: str, ver: str | None = None) -> None:
-    log.debug(f"[LCD] {lcdid} ver={ver or 'latest'}")
-    core = get_lcd(lcdid, ver)
-    log.debug(f"  lcd core: {len(core.get('data', []))} rows")
+    return ids
 
-    # VALID LCD coding endpoints: hcpc-code & hcpc-code-group
-    hcpcs = get_lcd_hcpc_code(lcdid, ver)
-    log.debug(f"  lcd hcpc-code: {len(hcpcs.get('data', []))} rows")
+def _ids_from_env() -> Dict[str, Any]:
+    ids: Dict[str, Any] = {}
+    # Article
+    if os.environ.get("EXAMPLE_ARTICLE_ID"):
+        ids["article_id"] = os.environ["EXAMPLE_ARTICLE_ID"]
+        ids["document_id"] = os.environ["EXAMPLE_ARTICLE_ID"]
+    if os.environ.get("EXAMPLE_ARTICLE_DISPLAY_ID"):
+        ids["article_display_id"] = os.environ["EXAMPLE_ARTICLE_DISPLAY_ID"]
+        ids["document_display_id"] = os.environ["EXAMPLE_ARTICLE_DISPLAY_ID"]
+    # LCD
+    if os.environ.get("EXAMPLE_LCD_ID"):
+        ids["lcd_id"] = os.environ["EXAMPLE_LCD_ID"]
+        ids["document_id"] = os.environ["EXAMPLE_LCD_ID"]
+    if os.environ.get("EXAMPLE_LCD_DISPLAY_ID"):
+        ids["lcd_display_id"] = os.environ["EXAMPLE_LCD_DISPLAY_ID"]
+        ids["document_display_id"] = os.environ["EXAMPLE_LCD_DISPLAY_ID"]
+    # version (optional)
+    if os.environ.get("EXAMPLE_DOCUMENT_VERSION"):
+        ids["document_version"] = os.environ["EXAMPLE_DOCUMENT_VERSION"]
+    return ids
 
-    hcpcs_group = get_lcd_hcpc_code_group(lcdid, ver)
-    log.debug(f"  lcd hcpc-code-group: {len(hcpcs_group.get('data', []))} rows")
+def _write_zip_with_csv(rows: List[Dict[str, Any]], zip_path: Path, csv_name_in_zip: str) -> None:
+    # Collect all keys to make a stable header
+    header: List[str] = []
+    seen = set()
+    for r in rows:
+        for k in r.keys():
+            if k not in seen:
+                seen.add(k)
+                header.append(k)
 
-    contractor = get_lcd_contractor(lcdid, ver)
-    log.debug(f"  lcd contractor: {len(contractor.get('data', []))} rows")
+    # Write CSV into an in-memory buffer, then zip it
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=header or ["document_type", "document_display_id", "document_id"])
+    writer.writeheader()
+    for r in rows:
+        writer.writerow(r)
 
-    revhist = get_lcd_revision_history(lcdid, ver)
-    log.debug(f"  lcd revision-history: {len(revhist.get('data', []))} rows")
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr(csv_name_in_zip, buf.getvalue())
 
-    primjur = get_lcd_primary_jurisdiction(lcdid, ver)
-    log.debug(f"  lcd primary-jurisdiction: {len(primjur.get('data', []))} rows")
+def _write_nocodes_csv_if_missing_or_empty(path: Path, header: Optional[List[str]] = None) -> None:
+    """
+    Always ensure there is a nocodes CSV. If the caller later writes
+    a non-empty one, that will overwrite this placeholder.
+    """
+    if header is None:
+        header = ["document_type", "document_display_id", "document_id", "reason"]
+    # Create/overwrite with just headers
+    with path.open("w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(header)
 
-    # IMPORTANT: do NOT call non-existent LCD endpoints like:
-    #   /data/lcd/code-table
-    #   /data/lcd/icd10-covered
-    # Those calls previously caused 400s in the logs.
+# ---------- main ----------
 
-
-def main(argv: list[str]) -> int:
-    # Minimal smoke run that exercises both branches with a single record each.
-    # The surrounding workflow should shard & iterate like your existing code.
+def main() -> None:
+    # Read “filters”, mainly for logs and parity with previous scripts
+    states = _env("COVERAGE_STATES")
+    status = _env("COVERAGE_STATUS")
+    contractors = _env("COVERAGE_CONTRACTORS")
+    max_docs = _env("COVERAGE_MAX_DOCS")
+    timeout_env = _env("COVERAGE_TIMEOUT")
     try:
-        # Example IDs are placeholders; your runner provides real ones.
-        example_article_id = os.environ.get("EXAMPLE_ARTICLE_ID")
-        example_lcd_id = os.environ.get("EXAMPLE_LCD_ID")
-
-        if example_article_id:
-            process_article(example_article_id)
-
-        if example_lcd_id:
-            process_lcd(example_lcd_id)
-
-        if not example_article_id and not example_lcd_id:
-            log.info("No EXAMPLE_* ids provided; run_once completed with no-ops.")
-        return 0
-    except ApiError as e:
-        log.error(str(e))
-        return 2
+        timeout = int(timeout_env) if timeout_env.strip() else 30
     except Exception:
-        log.exception("Unexpected failure")
-        return 3
+        timeout = 30
+
+    # License acceptance (token is optional, script should proceed either way)
+    ensure_license_acceptance(timeout=timeout)
+
+    # Discover lists
+    _debug("[DEBUG] trying /reports/local-coverage-final-lcds (no status)" if not status else "[DEBUG] trying /reports/local-coverage-final-lcds")
+    lcd_rows = list_final_lcds(states=states or "", status=status or "", contractors=contractors or "", timeout=timeout)
+
+    _debug("[DEBUG] trying /reports/local-coverage-articles (no status)" if not status else "[DEBUG] trying /reports/local-coverage-articles")
+    art_rows = list_articles(states=states or "", status=status or "", contractors=contractors or "", timeout=timeout)
+
+    _debug(f"[DEBUG] discovered {len(lcd_rows)} LCDs, {len(art_rows)} Articles (total {len(lcd_rows)+len(art_rows)})")
+
+    # Decide which doc(s) to probe
+    ids = _ids_from_env()
+    picked: List[Tuple[str, Dict[str, Any]]] = []
+
+    if ids:
+        # If env provided, we’ll just use those
+        # Prefer Article if article_* present, else LCD if lcd_* present
+        if any(k in ids for k in ("article_id", "article_display_id")):
+            picked.append(("Article", ids))
+        elif any(k in ids for k in ("lcd_id", "lcd_display_id")):
+            picked.append(("LCD", ids))
+        else:
+            # Raw document_* only → treat it as unknown; still probe via both families
+            picked.append(("Unknown", ids))
+        _debug("INFO EXAMPLE_* ids provided; using those for the sanity probe.")
+    else:
+        # Auto-pick: first Article and first LCD (if available)
+        if art_rows:
+            a_ids = _ids_from_row({**art_rows[0], "document_type": "Article"})
+            picked.append(("Article", a_ids))
+        if lcd_rows:
+            l_ids = _ids_from_row({**lcd_rows[0], "document_type": "LCD"})
+            picked.append(("LCD", l_ids))
+
+        if not picked:
+            print("INFO No EXAMPLE_* ids set and discovery returned no rows; run_once completed with no-ops.", flush=True)
+            # Still emit empty nocodes file so artifact step never fails.
+            _write_nocodes_csv_if_missing_or_empty(NOCODES_CSV)
+            _write_zip_with_csv([], CODES_ZIP, CODES_CSV_NAME_IN_ZIP)
+            return
+
+    # Probe the endpoints for each picked doc
+    aggregated_rows: List[Dict[str, Any]] = []
+    nocodes_rows: List[Dict[str, Any]] = []
+
+    families = [
+        ("code-table", get_codes_table_any),
+        ("icd10-covered", get_icd10_covered_any),
+        ("icd10-noncovered", get_icd10_noncovered_any),
+        ("hcpc-code", get_hcpc_codes_any),
+        ("hcpc-modifier", get_hcpc_modifiers_any),
+        ("revenue-code", get_revenue_codes_any),
+        ("bill-codes", get_bill_types_any),
+    ]
+
+    for (doc_type, doc_ids) in picked:
+        disp = doc_ids.get("article_display_id") or doc_ids.get("lcd_display_id") or doc_ids.get("document_display_id") or ""
+        num = doc_ids.get("article_id") or doc_ids.get("lcd_id") or doc_ids.get("document_id") or ""
+        ver = doc_ids.get("document_version") or ""
+        pretty_ids = " ".join(
+            f"{k}={v}" for k, v in doc_ids.items() if v not in (None, "")
+        )
+        _debug(f"[DEBUG] [{doc_type}] ids={{{pretty_ids}}}")
+
+        for fname, fn in families:
+            rows = []
+            try:
+                rows = list(fn(doc_ids, timeout))
+            except Exception as e:
+                _debug(f"[DEBUG]   -> /data/{doc_type.lower()}/{fname} exception: {e!r}")
+
+            # Basic debug around each call
+            if rows:
+                _debug(f"[DEBUG]   -> /data/{'article' if 'article' in doc_ids else 'lcd'}/{fname}: {len(rows)} rows")
+            else:
+                _debug(f"[DEBUG]   -> /data/{'article' if 'article' in doc_ids else 'lcd'}/{fname}: 0 rows")
+
+            # Tag and collect
+            for r in rows:
+                rr = dict(r)
+                rr["_document_type"] = doc_type
+                rr["_document_display_id"] = disp
+                rr["_document_id"] = num
+                rr["_document_version"] = ver
+                rr["_section"] = fname
+                aggregated_rows.append(rr)
+
+        # If we saw no rows for this doc at all, note that in nocodes output
+        if not any(r for r in aggregated_rows if r.get("_document_id") == num or r.get("_document_display_id") == disp):
+            nocodes_rows.append({
+                "document_type": doc_type,
+                "document_display_id": disp,
+                "document_id": num,
+                "reason": "No rows returned by any probed sections"
+            })
+
+    # Always emit nocodes CSV (headers only is fine)
+    if nocodes_rows:
+        with NOCODES_CSV.open("w", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=["document_type", "document_display_id", "document_id", "reason"])
+            w.writeheader()
+            for r in nocodes_rows:
+                w.writerow(r)
+    else:
+        _write_nocodes_csv_if_missing_or_empty(NOCODES_CSV)
+
+    # Emit codes zip (with CSV inside)
+    _write_zip_with_csv(aggregated_rows, CODES_ZIP, CODES_CSV_NAME_IN_ZIP)
+
+    # Friendly summary
+    _debug(f"        -> aggregated rows: {len(aggregated_rows)}")
+    if nocodes_rows:
+        _debug(f"        -> nocodes rows: {len(nocodes_rows)}")
+    print("Run completed.", flush=True)
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    main()
