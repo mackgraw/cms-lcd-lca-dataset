@@ -44,24 +44,43 @@ def _mk_label(row: Mapping[str, Any]) -> str:
     rid   = row.get("article_id") or row.get("id") or row.get("document_id") or ""
     return f"{title or '?'}  id={rid}  display={disp}"
 
-def _collect_for_ids(ids: Mapping[str, Any], timeout: int) -> List[Dict[str, Any]]:
+def _collect_for_ids(kind: str, ids: Mapping[str, Any], timeout: int) -> List[Dict[str, Any]]:
+    """
+    Collects rows only from endpoints that match the document *kind*.
+    kind: "Article" or "LCD"
+    """
     rows: List[Dict[str, Any]] = []
 
-    def tag_and_extend(endpoint: str, got: List[Dict[str, Any]]):
+    def tag_and_extend(endpoint: str, getter):
+        try:
+            got = getter(ids, timeout)
+        except Exception as e:
+            _debug(f"[DEBUG]   -> {endpoint} error: {e} (continue)")
+            got = []
         for r in got:
             r = dict(r)
             r["_endpoint"] = endpoint
             rows.append(r)
 
-    # Order matters only for readability; each call is safe and swallows 400s.
-    tag_and_extend("code-table",       get_codes_table_any(ids, timeout))
-    tag_and_extend("icd10-covered",    get_icd10_covered_any(ids, timeout))
-    tag_and_extend("icd10-noncovered", get_icd10_noncovered_any(ids, timeout))
-    tag_and_extend("hcpc-code",        get_hcpc_codes_any(ids, timeout))
-    tag_and_extend("hcpc-modifier",    get_hcpc_modifiers_any(ids, timeout))
-    tag_and_extend("revenue-code",     get_revenue_codes_any(ids, timeout))
-    tag_and_extend("bill-codes",       get_bill_types_any(ids, timeout))
-
+    if kind == "Article":
+        tag_and_extend("code-table",       get_codes_table_any)
+        tag_and_extend("icd10-covered",    get_icd10_covered_any)
+        tag_and_extend("icd10-noncovered", get_icd10_noncovered_any)
+        tag_and_extend("hcpc-code",        get_hcpc_codes_any)
+        tag_and_extend("hcpc-modifier",    get_hcpc_modifiers_any)
+        tag_and_extend("revenue-code",     get_revenue_codes_any)
+        tag_and_extend("bill-codes",       get_bill_types_any)
+    elif kind == "LCD":
+        # LCD versions of the above; reuse the same helpers which route by ids
+        tag_and_extend("code-table",       get_codes_table_any)
+        tag_and_extend("icd10-covered",    get_icd10_covered_any)
+        tag_and_extend("icd10-noncovered", get_icd10_noncovered_any)
+        tag_and_extend("hcpc-code",        get_hcpc_codes_any)
+        tag_and_extend("hcpc-modifier",    get_hcpc_modifiers_any)
+        tag_and_extend("revenue-code",     get_revenue_codes_any)
+        tag_and_extend("bill-codes",       get_bill_types_any)
+    else:
+        _debug(f"[DEBUG]   -> unknown kind {kind!r}; skipping")
     return rows
 
 def _write_csv(path: str, rows: List[Dict[str, Any]]) -> None:
@@ -201,7 +220,7 @@ def main() -> None:
         ids = _mk_ids(row)
 
         try:
-            got = _collect_for_ids(ids, TIMEOUT)
+            got = _collect_for_ids(kind, ids, TIMEOUT)
         except Exception as e:
             _debug(f"[DEBUG]   -> collect errored: {e} (continue)")
             got = []
