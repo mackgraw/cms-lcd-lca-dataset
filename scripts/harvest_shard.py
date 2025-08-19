@@ -1,72 +1,70 @@
-#!/usr/bin/env python3
-"""
-Sharded coverage harvester wrapper (manifest-driven).
+from __future__ import annotations
 
-- Partitions repo files into SHARD_TOTAL buckets by hashing the path.
-- Writes this shard's files to a manifest.
-- Invokes your harvester with `--manifest <path>` so it ONLY processes those files.
-
-Env:
-  SHARD_INDEX (int) : 0-based index for this shard
-  SHARD_TOTAL (int) : total number of shards
-  SHARD_BATCH_SIZE  : optional, how many files per batch to send (default 200)
-  HARVEST_CMD       : optional, command to run (default: python -m scripts.run_once)
-"""
-import hashlib
+import math
 import os
-import subprocess
-import sys
-from pathlib import Path
-from typing import List
+from typing import Any, Dict, List, Tuple
 
-def hash_mod(path: str, mod: int) -> int:
-    h = hashlib.md5(path.encode("utf-8")).hexdigest()
-    return int(h, 16) % mod
+from scripts.coverage_api import (
+    _env,
+    _debug,
+    ensure_license_acceptance,
+    list_final_lcds,
+    list_articles,
+    discover_ids_from_report_row,
+    get_codes_table_any,
+    get_icd10_covered_any,
+    get_icd10_noncovered_any,
+    get_hcpc_codes_any,
+    get_hcpc_modifiers_any,
+    get_revenue_codes_any,
+    get_bill_codes_any,
+)
 
-def repo_files() -> List[str]:
-    # Prefer git ls-files for deterministic lists
-    try:
-        out = subprocess.check_output(["git", "ls-files"], text=True)
-        files = [ln.strip() for ln in out.splitlines() if ln.strip()]
-        return files
-    except Exception:
-        # Fallback to walking the tree
-        return [str(p.as_posix()) for p in Path(".").rglob("*") if p.is_file()]
+def _chunk(items: List[Any], nshards: int, shard_index: int) -> List[Any]:
+    n = len(items)
+    if nshards <= 1:
+        return items
+    size = math.ceil(n / nshards)
+    start = shard_index * size
+    end = min(n, start + size)
+    return items[start:end]
 
-def chunked(seq, size):
-    for i in range(0, len(seq), size):
-        yield seq[i:i+size]
+def main() -> None:
+    STATES = _env("COVERAGE_STATES")
+    STATUS = _env("COVERAGE_STATUS")
+    CONTRACTORS = _env("COVERAGE_CONTRACTORS")
+    MAX_DOCS = int(_env("COVERAGE_MAX_DOCS") or "0")
+    TIMEOUT = int(_env("COVERAGE_TIMEOUT") or "30")
+    SHARDS = int(_env("COVERAGE_SHARDS") or "1")
+    SHARD_INDEX = int(_env("COVERAGE_SHARD_INDEX") or "0")
 
-def main():
-    shard_index = int(os.environ.get("SHARD_INDEX", "0"))
-    shard_total = int(os.environ.get("SHARD_TOTAL", "1"))
-    batch_size  = int(os.environ.get("SHARD_BATCH_SIZE", "200"))
-    harvest_cmd = os.environ.get("HARVEST_CMD", f"{sys.executable} -m scripts.run_once")
+    ensure_license_acceptance(timeout=TIMEOUT)
 
-    files = repo_files()
-    targeted = [f for f in files if hash_mod(f, shard_total) == shard_index]
+    lcds = list_final_lcds(states=STATES, status=STATUS, contractors=CONTRACTORS, timeout=TIMEOUT)
+    arts = list_articles(states=STATES, status=STATUS, contractors=CONTRACTORS, timeout=TIMEOUT)
+    docs = [("Article", r) for r in arts] + [("LCD", r) for r in lcds]
+    if MAX_DOCS > 0:
+        docs = docs[:MAX_DOCS]
 
-    print(f"Total files in repo: {len(files)}")
-    print(f"Shard {shard_index}/{shard_total}: {len(targeted)} files")
+    shard = _chunk(docs, SHARDS, SHARD_INDEX)
+    _debug(f"shard {SHARD_INDEX}/{SHARDS} -> {len(shard)} of {len(docs)} items")
 
-    logs_dir = Path(".harvest_logs"); logs_dir.mkdir(parents=True, exist_ok=True)
-    manifests_dir = Path(".harvest_manifests"); manifests_dir.mkdir(parents=True, exist_ok=True)
+    for i, (doctype, row) in enumerate(shard, start=1):
+        ids = discover_ids_from_report_row(row)
+        display = row.get("document_display_id")
+        _debug(f"[{doctype} {i}/{len(shard)}] {display} ids={ids}")
 
-    overall_rc = 0
-    for idx, batch in enumerate(chunked(targeted, batch_size), start=1):
-        manifest_path = manifests_dir / f"manifest_shard{shard_index:02d}_batch{idx:03d}.txt"
-        manifest_path.write_text("\n".join(batch), encoding="utf-8")
-        print(f"[INFO] Shard {shard_index}: batch {idx} with {len(batch)} files -> {manifest_path}")
-
-        # Run harvester with the manifest
-        cmd = f'{harvest_cmd} --manifest "{manifest_path.as_posix()}"'
-        print(f"[INFO] Running: {cmd}")
-        result = subprocess.run(cmd, shell=True)
-        if result.returncode != 0:
-            overall_rc = result.returncode
-            print(f"[WARN] Harvester returned {result.returncode} for batch {idx}", file=sys.stderr)
-
-    sys.exit(overall_rc)
+        if doctype == "Article":
+            for fn in (
+                get_codes_table_any,
+                get_icd10_covered_any,
+                get_icd10_noncovered_any,
+                get_hcpc_modifiers_any,
+                get_revenue_codes_any,
+                get_bill_codes_any,
+            ):
+                fn(ids, timeout=TIMEOUT)
+        get_hcpc_codes_any(ids, timeout=TIMEOUT)
 
 if __name__ == "__main__":
     main()
