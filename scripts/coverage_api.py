@@ -2,262 +2,185 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
-
+import time
+import typing as t
+import urllib.parse
 import requests
-from tenacity import RetryError, retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
-# --------------------------------------------------------------------------- #
-# Basic plumbing
-# --------------------------------------------------------------------------- #
+BASE_URL = "https://api.coverage.cms.gov/v1"
 
-_BASE = "https://api.coverage.cms.gov/v1"
+# Optional bearer token from the license-agreement endpoint.
+# We tolerate missing token and proceed (public endpoints).
+LICENSE_BEARER = os.environ.get("COVERAGE_LICENSE_BEARER", "").strip()
 
-def _debug(msg: str) -> None:
-    print(msg, flush=True)
+# ---- Utilities --------------------------------------------------------------
 
-class _HTTPError(RuntimeError):
+class ApiError(RuntimeError):
     pass
 
-def _headers() -> Dict[str, str]:
-    return {"User-Agent": "cms-lcd-lca-harvester/1.0"}
 
-def _params_with_license(params: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
-    tok = os.environ.get("COVERAGE_LICENSE_TOKEN", "").strip()
-    out = dict(params or {})
-    if tok:
-        out["license_token"] = tok
-    return out
+def _headers() -> dict:
+    h = {"Accept": "application/json"}
+    if LICENSE_BEARER:
+        h["Authorization"] = f"Bearer {LICENSE_BEARER}"
+    return h
 
-def _shorten(s: str, n: int = 120) -> str:
-    s = s or ""
-    return s if len(s) <= n else s[:n] + "…"
 
-@retry(
-    reraise=True,
-    stop=stop_after_attempt(4),
-    wait=wait_exponential(multiplier=0.6, min=0.6, max=3.5),
-    retry=retry_if_exception_type(_HTTPError),
-)
-def _get(path: str, params: Optional[Mapping[str, Any]], timeout: int) -> Dict[str, Any]:
-    full = f"{_BASE}{path}"
-    prms = _params_with_license(params)
-    _debug(f"[DEBUG] GET {full} -> ...")
-    try:
-        r = requests.get(full, params=prms, headers=_headers(), timeout=timeout)
-        r.raise_for_status()
-        j = r.json()
-        keys = list(j.keys()) if isinstance(j, dict) else []
-        _debug(f"[DEBUG] GET {full} -> {r.status_code}; keys={keys}")
-        return j
-    except requests.HTTPError as e:
-        # Try to extract a concise server message
-        msg = ""
-        try:
-            jj = r.json()
-            if isinstance(jj, dict):
-                # Common shapes: {"message": "...", "id": "..."} or {"errors":[...]}
-                if "message" in jj:
-                    msg = str(jj.get("message") or "")
-                elif "errors" in jj:
-                    msg = str(jj.get("errors"))
-        except Exception:
-            pass
-        msg_short = _shorten(msg, 120) if msg else ""
-        _debug(f"[DEBUG] GET {full} -> {r.status_code}; keys={[k for k in (list(jj.keys()) if isinstance(jj, dict) else [])]}{('; message=' + msg_short) if msg_short else ''}")
-        raise _HTTPError(f"{r.status_code} for {full}: {msg_short}") from e
+def _sleep_backoff(attempt: int) -> None:
+    time.sleep(min(1.5 * attempt, 6.0))
 
-# --------------------------------------------------------------------------- #
-# License acceptance (optional, benign if not required)
-# --------------------------------------------------------------------------- #
 
-def ensure_license_acceptance(timeout: int = 30) -> None:
-    existing = os.environ.get("COVERAGE_LICENSE_TOKEN", "").strip()
-    if existing:
-        print("[note] CMS license agreement acknowledged (existing token).", flush=True)
-        return
-    try:
-        j = _get("/metadata/license-agreement", None, timeout)
-    except (RetryError, _HTTPError):
-        print("[warn] license-agreement endpoint not reachable/ok; proceeding without token.", flush=True)
-        return
-
-    token = ""
-    if isinstance(j, dict):
-        if "data" in j and isinstance(j["data"], list) and j["data"]:
-            maybe = j["data"][0]
-            if isinstance(maybe, dict):
-                token = str(maybe.get("token", "")).strip()
-        if not token:
-            token = str(j.get("token", "")).strip()
-
-    if token:
-        os.environ["COVERAGE_LICENSE_TOKEN"] = token
-        print("[note] CMS license agreement acknowledged.", flush=True)
-    else:
-        print("[note] CMS license agreement acknowledged (no token provided).", flush=True)
-
-# --------------------------------------------------------------------------- #
-# Reports discovery (lists)
-# --------------------------------------------------------------------------- #
-
-def _paged_report(path: str, timeout: int, params: Optional[Mapping[str, Any]] = None) -> List[Dict[str, Any]]:
-    payload = _get(path, params, timeout)
-    return list(payload.get("data") or [])
-
-def list_final_lcds(states: str, status: str, contractors: str, timeout: int) -> List[Dict[str, Any]]:
-    params: Dict[str, Any] = {}
-    if states.strip():
-        params["states"] = states
-    if status.strip():
-        params["status"] = status
-    if contractors.strip():
-        params["contractors"] = contractors
-    _debug("[DEBUG] trying /reports/local-coverage-final-lcds" + ("" if status else " (no status)"))
-    return _paged_report("/reports/local-coverage-final-lcds", timeout, params)
-
-def list_articles(states: str, status: str, contractors: str, timeout: int) -> List[Dict[str, Any]]:
-    params: Dict[str, Any] = {}
-    if states.strip():
-        params["states"] = states
-    if status.strip():
-        params["status"] = status
-    if contractors.strip():
-        params["contractors"] = contractors
-    _debug("[DEBUG] trying /reports/local-coverage-articles" + ("" if status else " (no status)"))
-    return _paged_report("/reports/local-coverage-articles", timeout, params)
-
-# --------------------------------------------------------------------------- #
-# Param shaping
-# --------------------------------------------------------------------------- #
-
-def _ids_to_param_sets(row_ids: Mapping[str, Any]) -> List[Dict[str, Any]]:
+def _is_known_fake_400(payload: t.Any) -> bool:
     """
-    Build permutations of id params supported by the v1 endpoints.
-    For Articles: article_id, article_display_id (+ document_version if provided).
-    For LCDs:     lcd_id, lcd_display_id (+ document_version if provided).
-    Fallbacks include document_id/document_display_id (from reports).
+    The API returns 400 with a friendly message when you hit a non-existent route
+    family like /data/lcd/code-table. Treat those as 'endpoint not available'.
     """
-    p: List[Dict[str, Any]] = []
+    if not isinstance(payload, dict):
+        return False
+    msg = str(payload.get("message", "")).lower()
+    return "please reference the documentation" in msg or "swagger" in msg
 
-    # raw values found on report rows
-    article_id = row_ids.get("article_id") or row_ids.get("id") or row_ids.get("document_id")
-    article_disp = row_ids.get("article_display_id") or row_ids.get("display_id") or row_ids.get("document_display_id")
 
-    lcd_id = row_ids.get("lcd_id") or row_ids.get("id") or row_ids.get("document_id")
-    lcd_disp = row_ids.get("lcd_display_id") or row_ids.get("display_id") or row_ids.get("document_display_id")
+def _get(path: str, params: dict | None = None, tolerate_404=False) -> dict:
+    url = urllib.parse.urljoin(BASE_URL + "/", path.lstrip("/"))
+    for attempt in range(1, 5):
+        r = requests.get(url, params=params or {}, headers=_headers(), timeout=60)
+        ct = r.headers.get("content-type", "")
+        is_json = "json" in ct
+        data = r.json() if is_json else {"status_code": r.status_code, "text": r.text}
 
-    version = row_ids.get("document_version")
+        if r.status_code == 200:
+            return data
 
-    # Article param combos
-    for key, val in (("article_id", article_id), ("article_display_id", article_disp),
-                     ("document_id", row_ids.get("document_id")), ("document_display_id", row_ids.get("document_display_id"))):
-        if val:
-            d = {key: val}
-            if version:
-                d["document_version"] = version
-            p.append(d)
+        if r.status_code in (404,) and tolerate_404:
+            return {"meta": {"status": {"id": 404, "message": "not found"}}, "data": []}
 
-    # LCD param combos
-    for key, val in (("lcd_id", lcd_id), ("lcd_display_id", lcd_disp),
-                     ("document_id", row_ids.get("document_id")), ("document_display_id", row_ids.get("document_display_id"))):
-        if val:
-            d = {key: val}
-            if version:
-                d["document_version"] = version
-            p.append(d)
+        # Known "friendly 400" when endpoint doesn’t exist
+        if r.status_code == 400 and _is_known_fake_400(data):
+            return {"meta": {"status": {"id": 400, "message": "endpoint not available"}}, "data": []}
 
-    # Always include an empty dict last (some endpoints may support no id for testing)
-    p.append({})
-    return p
-
-def _try_many(paths: Iterable[str], ids: Mapping[str, Any], timeout: int) -> List[Dict[str, Any]]:
-    """
-    Try each path with each id-key permutation. Return [] on errors or when the
-    endpoint yields zero rows (we treat zero rows as a valid but empty result).
-    """
-    for path in paths:
-        for params in _ids_to_param_sets(ids):
-            pretty_keys = ",".join(params.keys()) if params else ""
-            try:
-                payload = _get(path, params or None, timeout)
-            except (RetryError, _HTTPError) as e:
-                _debug(f"[DEBUG]   -> {path} with {pretty_keys or '(no-params)'}: {e} (continue)")
-                continue
-
-            meta = payload.get("meta") or {}
-            data = payload.get("data") or []
-            if isinstance(data, list) and data:
-                return data
-
-            _debug(f"[DEBUG]   page meta: {list(meta.keys()) or []}")
-            _debug(f"[DEBUG]   -> {path} with {pretty_keys or '(no-params)'}: {len(data)} rows")
-    return []
-
-# --------------------------------------------------------------------------- #
-# Detail endpoints (sanity probes)
-# --------------------------------------------------------------------------- #
-
-def get_lcd_detail_any(ids: Mapping[str, Any], timeout: int) -> Dict[str, Any]:
-    # v1 LCD detail lives at /data/lcd/
-    for params in _ids_to_param_sets(ids):
-        try:
-            return _get("/data/lcd", params or None, timeout)
-        except (RetryError, _HTTPError):
+        # Retry on 5xx and transient 4xx
+        if r.status_code >= 500 or r.status_code in (408, 429):
+            _sleep_backoff(attempt)
             continue
-    return {}
 
-def get_article_detail_any(ids: Mapping[str, Any], timeout: int) -> Dict[str, Any]:
-    for params in _ids_to_param_sets(ids):
-        try:
-            return _get("/data/article", params or None, timeout)
-        except (RetryError, _HTTPError):
-            continue
-    return {}
+        # Hard error
+        raise ApiError(f"GET {url} -> {r.status_code}: {data!r}")
 
-# --------------------------------------------------------------------------- #
-# Harvest families — BACKWARD-COMPAT NAMES expected by run_once.py
-# Each tries Article first, then LCD (per your earlier intent).
-# --------------------------------------------------------------------------- #
+    raise ApiError(f"GET {url} failed after retries.")
 
-def get_codes_table_any(ids: Mapping[str, Any], timeout: int) -> List[Dict[str, Any]]:
-    return _try_many(
-        ["/data/article/code-table", "/data/lcd/code-table"],  # lcd code-table may be empty/non-existent in practice
-        ids, timeout
-    )
+# ---- Article endpoints ------------------------------------------------------
 
-def get_icd10_covered_any(ids: Mapping[str, Any], timeout: int) -> List[Dict[str, Any]]:
-    return _try_many(
-        ["/data/article/icd10-covered", "/data/lcd/icd10-covered"],
-        ids, timeout
-    )
+def get_article(article_id: str, ver: str | None = None) -> dict:
+    params = {"articleid": article_id}
+    if ver:
+        params["ver"] = ver
+    return _get("/data/article/", params)
 
-def get_icd10_noncovered_any(ids: Mapping[str, Any], timeout: int) -> List[Dict[str, Any]]:
-    return _try_many(
-        ["/data/article/icd10-noncovered", "/data/lcd/icd10-noncovered"],
-        ids, timeout
-    )
+def get_article_code_table(article_id: str, ver: str | None = None) -> dict:
+    params = {"articleid": article_id}
+    if ver:
+        params["ver"] = ver
+    return _get("/data/article/code-table", params)
 
-def get_hcpc_codes_any(ids: Mapping[str, Any], timeout: int) -> List[Dict[str, Any]]:
-    return _try_many(
-        ["/data/article/hcpc-code", "/data/lcd/hcpc-code"],
-        ids, timeout
-    )
+def get_article_icd10_covered(article_id: str, ver: str | None = None) -> dict:
+    params = {"articleid": article_id}
+    if ver:
+        params["ver"] = ver
+    return _get("/data/article/icd10-covered", params)
 
-def get_hcpc_modifiers_any(ids: Mapping[str, Any], timeout: int) -> List[Dict[str, Any]]:
-    return _try_many(
-        ["/data/article/hcpc-modifier", "/data/lcd/hcpc-modifier"],
-        ids, timeout
-    )
+def get_article_icd10_noncovered(article_id: str, ver: str | None = None) -> dict:
+    params = {"articleid": article_id}
+    if ver:
+        params["ver"] = ver
+    return _get("/data/article/icd10-noncovered", params)
 
-def get_revenue_codes_any(ids: Mapping[str, Any], timeout: int) -> List[Dict[str, Any]]:
-    return _try_many(
-        ["/data/article/revenue-code", "/data/lcd/revenue-code"],
-        ids, timeout
-    )
+def get_article_icd10_pcs(article_id: str, ver: str | None = None) -> dict:
+    params = {"articleid": article_id}
+    if ver:
+        params["ver"] = ver
+    return _get("/data/article/icd10-pcs-code", params)
 
-def get_bill_types_any(ids: Mapping[str, Any], timeout: int) -> List[Dict[str, Any]]:
-    return _try_many(
-        ["/data/article/bill-codes", "/data/lcd/bill-codes"],
-        ids, timeout
-    )
+def get_article_hcpc_code(article_id: str, ver: str | None = None) -> dict:
+    params = {"articleid": article_id}
+    if ver:
+        params["ver"] = ver
+    return _get("/data/article/hcpc-code", params)
+
+# ---- LCD endpoints (VALID ones only) ---------------------------------------
+
+def get_lcd(lcdid: str, ver: str | None = None) -> dict:
+    params = {"lcdid": lcdid}
+    if ver:
+        params["ver"] = ver
+    return _get("/data/lcd/", params)
+
+def get_lcd_hcpc_code(lcdid: str, ver: str | None = None) -> dict:
+    params = {"lcdid": lcdid}
+    if ver:
+        params["ver"] = ver
+    return _get("/data/lcd/hcpc-code", params)
+
+def get_lcd_hcpc_code_group(lcdid: str, ver: str | None = None) -> dict:
+    params = {"lcdid": lcdid}
+    if ver:
+        params["ver"] = ver
+    return _get("/data/lcd/hcpc-code-group", params)
+
+def get_lcd_contractor(lcdid: str, ver: str | None = None) -> dict:
+    params = {"lcdid": lcdid}
+    if ver:
+        params["ver"] = ver
+    return _get("/data/lcd/contractor", params)
+
+def get_lcd_revision_history(lcdid: str, ver: str | None = None) -> dict:
+    params = {"lcdid": lcdid}
+    if ver:
+        params["ver"] = ver
+    return _get("/data/lcd/revision-history", params)
+
+def get_lcd_primary_jurisdiction(lcdid: str, ver: str | None = None) -> dict:
+    params = {"lcdid": lcdid}
+    if ver:
+        params["ver"] = ver
+    return _get("/data/lcd/primary-jurisdiction", params)
+
+# ---- Helpers used by run_once ----------------------------------------------
+
+def get_codes_table_any(document_type: str, identifier: str, ver: str | None = None) -> dict:
+    """
+    Unified helper used by the pipeline:
+      - For ARTICLES: returns SAD exclusion code table (/data/article/code-table)
+      - For LCDs: there is NO equivalent 'code-table'; return an empty shape.
+    """
+    dt = document_type.lower().strip()
+    if dt == "article":
+        return get_article_code_table(identifier, ver)
+    if dt == "lcd":
+        # No such endpoint for LCDs; return empty structure but valid meta.
+        return {"meta": {"status": {"id": 200, "message": "ok"}}, "data": []}
+    raise ValueError(f"Unsupported document_type: {document_type}")
+
+def get_icd10_any(document_type: str, identifier: str, ver: str | None = None) -> dict:
+    """
+    Returns ICD-10 data:
+      - For ARTICLES: use icd10-covered + icd10-noncovered.
+      - For LCDs: NO /data/lcd/icd10-* endpoints exist; return empty.
+    """
+    dt = document_type.lower().strip()
+    if dt == "article":
+        covered = get_article_icd10_covered(identifier, ver)
+        noncov = get_article_icd10_noncovered(identifier, ver)
+        pcs = get_article_icd10_pcs(identifier, ver)
+        # Merge into a single payload for convenience
+        return {
+            "meta": {"status": {"id": 200, "message": "ok"}},
+            "data": {
+                "covered": covered.get("data", []),
+                "noncovered": noncov.get("data", []),
+                "pcs": pcs.get("data", []),
+            },
+        }
+    if dt == "lcd":
+        return {"meta": {"status": {"id": 200, "message": "ok"}}, "data": {"covered": [], "noncovered": [], "pcs": []}}
+    raise ValueError(f"Unsupported document_type: {document_type}")
