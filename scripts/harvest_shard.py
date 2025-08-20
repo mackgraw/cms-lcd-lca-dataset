@@ -15,9 +15,11 @@ LOG_DIR = Path(".harvest_logs")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
+
 def _env(name: str, default: Optional[str] = None) -> Optional[str]:
     v = os.getenv(name)
     return default if v is None or v.strip() == "" else v.strip()
+
 
 def _env_int(name: str, default: Optional[int]) -> Optional[int]:
     v = _env(name, None)
@@ -25,6 +27,7 @@ def _env_int(name: str, default: Optional[int]) -> Optional[int]:
         return int(v) if v is not None else default
     except Exception:
         return default
+
 
 def _print_env():
     for n in [
@@ -38,6 +41,7 @@ def _print_env():
     ]:
         print(f"[PY-ENV] {n} = {_env(n, '')}")
 
+
 def _open_csv(path: Path, header: List[str]):
     new = not path.exists()
     f = path.open("a", newline="", encoding="utf-8")
@@ -46,10 +50,12 @@ def _open_csv(path: Path, header: List[str]):
         w.writeheader()
     return f, w
 
+
 def _summarize(by_ep: Dict[str, List[dict]]) -> Tuple[Dict[str, int], int]:
     counts = {ep: len(rows) for ep, rows in by_ep.items()}
     total = sum(counts.values())
     return counts, total
+
 
 def _write_rows(writer, doc_type: str, meta: dict, ep: str, rows: List[dict], disp: str):
     for r in rows:
@@ -66,11 +72,22 @@ def _write_rows(writer, doc_type: str, meta: dict, ep: str, rows: List[dict], di
             }
         )
 
+
 def _slice_for_shard(items: List[dict], shard_index: int, shard_total: int) -> List[dict]:
-    """Stable, deterministic split by *original order* (no hashing).
-    Shard k processes items where position % shard_total == shard_index.
     """
-    return [row for pos, row in enumerate(items) if (pos % shard_total) == shard_index]
+    Stable, deterministic split by original order (no hashing).
+    Shard k processes items where (position % shard_total) == shard_index.
+
+    Adds a _pos key to each selected item for debug visibility.
+    """
+    selected = []
+    for pos, row in enumerate(items):
+        if (pos % shard_total) == shard_index:
+            r = dict(row)
+            r["_pos"] = pos  # keep original global index for debugging
+            selected.append(r)
+    return selected
+
 
 def main():
     _print_env()
@@ -93,7 +110,7 @@ def main():
     ensure_license_acceptance(timeout=timeout)
     lcds, arts = fetch_local_reports(timeout=timeout)
 
-    # Optional global limit (applied *before* sharding for fairness across shards)
+    # Optional global limit (applied BEFORE sharding for fairness)
     if max_docs:
         lcds = lcds[:max_docs]
         arts = arts[:max_docs]
@@ -122,7 +139,8 @@ def main():
         # LCDs
         for idx, lcd in enumerate(lcds_shard, 1):
             disp = lcd.get("lcd_display_id") or lcd.get("document_display_id")
-            print(f"[DEBUG] [LCD {idx}/{len(lcds_shard)}] {disp}")
+            src_pos = lcd.get("_pos")
+            print(f"[DEBUG] [LCD {idx}/{len(lcds_shard)} | src_pos={src_pos}] {disp}")
             by_ep, meta = harvest_lcd_endpoints(lcd, timeout=timeout)
             _, total = _summarize(by_ep)
             print(f"[sum] {disp}: total={total}")
@@ -146,7 +164,8 @@ def main():
         # Articles
         for idx, art in enumerate(arts_shard, 1):
             disp = art.get("article_display_id") or art.get("document_display_id")
-            print(f"[DEBUG] [Article {idx}/{len(arts_shard)}] {disp}")
+            src_pos = art.get("_pos")
+            print(f"[DEBUG] [Article {idx}/{len(arts_shard)} | src_pos={src_pos}] {disp}")
             by_ep, meta = harvest_article_endpoints(art, timeout=timeout)
             _, total = _summarize(by_ep)
             print(f"[sum] {disp}: total={total}")
@@ -174,6 +193,7 @@ def main():
 
     print(f"[note] Shard {shard_index+1}/{shard_total} wrote {wrote} code rows to {codes_csv}")
     print(f"[note] Shard {shard_index+1}/{shard_total} completed. See {nocodes_csv} for zero‑row documents.")
+
 
 if __name__ == "__main__":
     main()
