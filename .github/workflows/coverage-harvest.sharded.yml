@@ -123,9 +123,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p prev
-          # Try to download the latest release asset named exactly 'article_code_table_normalized.csv'
           gh release download --repo "${{ github.repository }}" \
-            --pattern "article_code_table_normalized.csv" \
+            --pattern "codes_normalized.csv" \
             --dir prev --clobber || echo "No previous normalized file found; first run?"
 
       - name: Compute normalized codes and changes
@@ -134,7 +133,7 @@ jobs:
           set -euo pipefail
           python -m scripts.compute_changes \
             dataset/document_codes.csv \
-            prev/article_code_table_normalized.csv || \
+            prev/codes_normalized.csv || \
             python -m scripts.compute_changes dataset/document_codes.csv
 
       - name: Upload merged & changes artifacts
@@ -144,15 +143,15 @@ jobs:
           path: |
             dataset/document_codes.csv
             dataset/document_nocodes.csv
-            dataset/article_code_table_normalized.csv
-            dataset/article_code_table_changes.csv
+            dataset/codes_normalized.csv
+            dataset/codes_changes.csv
             ${{ steps.mkzip.outputs.zip_name }}
 
       # === Create a dated GitHub Release and attach assets ===
       - name: Create GitHub Release and upload assets
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ github.run_id }}-${{ github.run_attempt }}   # always unique
+          tag_name: v${{ github.run_id }}-${{ github.run_attempt }}
           name: "Daily dataset – ${{ github.run_id }}"
           body: |
             Automated daily harvest.
@@ -164,8 +163,8 @@ jobs:
           files: |
             dataset/document_codes.csv
             dataset/document_nocodes.csv
-            dataset/article_code_table_normalized.csv
-            dataset/article_code_table_changes.csv
+            dataset/codes_normalized.csv
+            dataset/codes_changes.csv
             ${{ steps.mkzip.outputs.zip_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

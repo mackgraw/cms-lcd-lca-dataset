@@ -1,94 +1,76 @@
 from __future__ import annotations
-import csv, json, sys
-from pathlib import Path
-from typing import Dict, Iterable, List
+from typing import Dict, Iterable, List, Tuple
 
-# Local imports
-from scripts.diff_changes import compute_code_changes
-from scripts.normalize import norm_article_code_row
+def _key(r: Dict[str, str]) -> Tuple[str, str, str, str]:
+    # Unique row across both Article and LCD:
+    # (doc_type, doc_id, code_system, code)
+    return (
+        (r.get("doc_type") or "").strip(),
+        (r.get("doc_id") or "").strip(),
+        (r.get("code_system") or "").strip(),
+        (r.get("code") or "").strip(),
+    )
 
-"""
-Usage:
-  python -m scripts.compute_changes <current_document_codes.csv> [prev_article_code_table_normalized.csv]
+def compute_code_changes(prev_rows: Iterable[Dict[str, str]], curr_rows: Iterable[Dict[str, str]]) -> List[Dict[str, str]]:
+    """
+    Returns list of change dicts with fields:
+      - change_type: Added | Removed | FlagChanged
+      - doc_type, doc_id, code_system, code
+      - prev_flag, curr_flag
+    """
+    prev_map: Dict[Tuple[str, str, str, str], Dict[str, str]] = {}
+    curr_map: Dict[Tuple[str, str, str, str], Dict[str, str]] = {}
 
-Outputs:
-  dataset/article_code_table_normalized.csv
-  dataset/article_code_table_changes.csv  (empty if no prev provided or first run)
-"""
+    for r in prev_rows:
+        prev_map[_key(r)] = r
+    for r in curr_rows:
+        curr_map[_key(r)] = r
 
-OUT_DIR = Path("dataset")
-OUT_DIR.mkdir(parents=True, exist_ok=True)
+    changes: List[Dict[str, str]] = []
 
-def _read_csv_rows(path: Path) -> Iterable[Dict[str, str]]:
-    with path.open("r", encoding="utf-8", newline="") as f:
-        r = csv.DictReader(f)
-        for row in r:
-            yield row
+    # Added / FlagChanged
+    for k, curr in curr_map.items():
+        if k not in prev_map:
+            changes.append(
+                {
+                    "change_type": "Added",
+                    "doc_type": curr.get("doc_type", ""),
+                    "doc_id": curr.get("doc_id", ""),
+                    "code_system": curr.get("code_system", ""),
+                    "code": curr.get("code", ""),
+                    "prev_flag": "",
+                    "curr_flag": curr.get("coverage_flag", ""),
+                }
+            )
+        else:
+            prev = prev_map[k]
+            pf, cf = (prev.get("coverage_flag", "") or ""), (curr.get("coverage_flag", "") or "")
+            if pf != cf:
+                changes.append(
+                    {
+                        "change_type": "FlagChanged",
+                        "doc_type": curr.get("doc_type", ""),
+                        "doc_id": curr.get("doc_id", ""),
+                        "code_system": curr.get("code_system", ""),
+                        "code": curr.get("code", ""),
+                        "prev_flag": pf,
+                        "curr_flag": cf,
+                    }
+                )
 
-def _write_csv_rows(path: Path, header: List[str], rows: Iterable[Dict[str, str]]):
-    newfile = not path.exists()
-    with path.open("w", encoding="utf-8", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=header)
-        w.writeheader()
-        for row in rows:
-            w.writerow(row)
+    # Removed
+    for k, prev in prev_map.items():
+        if k not in curr_map:
+            changes.append(
+                {
+                    "change_type": "Removed",
+                    "doc_type": prev.get("doc_type", ""),
+                    "doc_id": prev.get("doc_id", ""),
+                    "code_system": prev.get("code_system", ""),
+                    "code": prev.get("code", ""),
+                    "prev_flag": prev.get("coverage_flag", "") or "",
+                    "curr_flag": "",
+                }
+            )
 
-def _normalize_current(document_codes_csv: Path) -> List[Dict[str, str]]:
-    # Expect columns: document_type, document_id, endpoint, row_json,...
-    out: List[Dict[str, str]] = []
-    for row in _read_csv_rows(document_codes_csv):
-        if row.get("document_type") != "Article":
-            continue  # diff focuses on article code table for now
-        if row.get("endpoint") != "/data/article/code-table":
-            continue
-        aid = str(row.get("document_id") or "").strip()
-        if not aid:
-            continue
-        try:
-            payload = json.loads(row.get("row_json") or "{}")
-        except Exception:
-            payload = {}
-        norm = norm_article_code_row(aid, {
-            "code": payload.get("code") or payload.get("Code"),
-            "description": payload.get("description") or payload.get("Description"),
-            "coverage_flag": payload.get("coverage_flag") or payload.get("CoverageFlag") or "",
-            "code_system": payload.get("code_system") or payload.get("CodeSystem") or "",
-        })
-        out.append(norm)
-    return out
-
-def main() -> int:
-    if len(sys.argv) < 2:
-        print("Usage: python -m scripts.compute_changes <current_document_codes.csv> [prev_normalized.csv]", file=sys.stderr)
-        return 2
-
-    current_csv = Path(sys.argv[1]).resolve()
-    prev_norm_csv = Path(sys.argv[2]).resolve() if len(sys.argv) >= 3 else None
-
-    current_norm = _normalize_current(current_csv)
-    norm_path = OUT_DIR / "article_code_table_normalized.csv"
-    _write_csv_rows(norm_path, ["article_id", "code", "description", "coverage_flag", "code_system"], current_norm)
-    print(f"[ok] wrote normalized: {norm_path} ({len(current_norm)} rows)")
-
-    changes_path = OUT_DIR / "article_code_table_changes.csv"
-    if prev_norm_csv and prev_norm_csv.exists():
-        prev_norm = list(_read_csv_rows(prev_norm_csv))
-        changes = compute_code_changes(prev_norm, current_norm)
-        _write_csv_rows(
-            changes_path,
-            ["change_type", "article_id", "code_system", "code", "prev_flag", "curr_flag"],
-            changes,
-        )
-        print(f"[ok] wrote changes: {changes_path} ({len(changes)} rows)")
-    else:
-        # first run: create empty changes file with header
-        _write_csv_rows(
-            changes_path,
-            ["change_type", "article_id", "code_system", "code", "prev_flag", "curr_flag"],
-            [],
-        )
-        print(f"[ok] no previous normalized file; created empty changes file: {changes_path}")
-    return 0
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+    return changes
