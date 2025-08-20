@@ -1,63 +1,55 @@
-# CMS LCD/LCA Dataset (Daily Auto-Updated)
+# CMS LCD/LCA Dataset (Daily, Sharded, Auto‑Released)
 
-**What you get**
-- `documents_latest.csv` — LCDs & Articles with contractor, state, status, **source_url**
-- `document_codes_latest.csv` — per-article code rows (ICD-10, HCPCS/CPT, Revenue, Bill Type, HCPCS Modifiers), with `coverage_flag`
-- `changes_YYYY-MM.csv` — Added / Removed / FlagChanged vs prior run
+**What you get (Release assets)**
+- `document_codes.csv` — merged from all shards; per‑document code rows (ICD‑10, HCPCS/CPT, Revenue, Bill Type, HCPCS Modifier) with `coverage_flag`.
+- `document_nocodes.csv` — documents that returned no code rows during this run.
+- `codes_normalized.csv` — normalized codes across **Articles and LCDs** with a stable schema.
+- `codes_changes.csv` — day‑over‑day diff vs the *previous release* (`Added`, `Removed`, `FlagChanged`).
+- `dataset-YYYYMMDD-HHMMSS.zip` — zipped `document_codes.csv` + `document_nocodes.csv`.
 
-**Download the latest ZIP**
-➡️ https://github.com/mackgraw/cms-lcd-lca-dataset/releases/latest/download/cms_lcd_lca_dataset_latest.zip
+**Download the latest**
+➡️ https://github.com/mackgraw/cms-lcd-lca-dataset/releases/latest
 
 **How it updates**
-- GitHub Actions runs daily at 07:05 ET
-- Commits CSVs to `/dataset/` and publishes a Release ZIP
+- GitHub Actions sharded workflow runs **daily at 06:00 UTC** (cron `0 6 * * *`).
+- Each run builds shards in parallel, merges CSVs, computes normalized + changes files, and **creates a new Release** (marked latest).
 
 **Notes**
 - Data derived from CMS Coverage API. CPT is AMA IP; this redistributes code identifiers only, not proprietary CPT text. Not legal/clinical advice.
 
-## Dataset Fields
+## File Schemas
 
-The dataset includes three main CSVs:
+### `document_codes.csv`
+- `document_type` — `LCD` | `Article`
+- `document_id` — CMS identifier (e.g., `L392XX` or `52840`)
+- `code_system` — `ICD10-CM` | `HCPCS/CPT` | `Revenue` | `Bill Type` | `HCPCS Modifier`
+- `code` — code value
+- `description` — human‑readable description if provided by API
+- `coverage_flag` — `covered` | `noncovered` | `` (n/a)
 
-- **documents_latest.csv**  
-  Contains metadata for each LCD and Article.  
-  Columns:
-  - `document_id`: CMS identifier
-  - `doc_type`: LCD or Article
-  - `title`: Document title
-  - `status`: Current status (Active, Retired, Future)
-  - `effective_date`: Effective date if present
-  - `source_url`: Direct link to the CMS Medicare Coverage Database (LCD/Article page)
+### `document_nocodes.csv`
+- `document_type`, `document_id`, plus metadata about the fetch that yielded no code rows this run.
 
-- **document_codes_latest.csv**  
-  Contains ICD10, HCPCS, CPT, Bill Type, Revenue, and Modifier codes associated with articles.  
-  Columns:
-  - `article_id`
-  - `code`
-  - `description`
-  - `coverage_flag` (e.g., covered, noncovered)
-  - `code_system`
+### `codes_normalized.csv`
+- `doc_type` — `LCD` | `Article`
+- `doc_id` — CMS identifier
+- `code_system` — as above
+- `code`
+- `description`
+- `coverage_flag`
 
-- **changes_YYYY-MM.csv**  
-  Tracks changes in codes month-over-month.  
-  Columns:
-  - `change_type` (added/removed/changed)
-  - `article_id`
-  - `code_system`
-  - `code`
-  - `prev_flag`
-  - `curr_flag`
+### `codes_changes.csv`
+- `change_type` — `Added` | `Removed` | `FlagChanged`
+- `doc_type`
+- `doc_id`
+- `code_system`
+- `code`
+- `prev_flag`
+- `curr_flag`
 
-## Example Usage
-
-Load in Python with pandas:
-
+## Example (Python)
 ```python
 import pandas as pd
-
-docs = pd.read_csv("dataset/documents_latest.csv")
-codes = pd.read_csv("dataset/document_codes_latest.csv")
-
-# See first few documents with direct CMS URLs
-print(docs[["document_id", "title", "source_url"]].head())
-
+codes = pd.read_csv("codes_normalized.csv")
+changes = pd.read_csv("codes_changes.csv")
+print(changes['change_type'].value_counts())

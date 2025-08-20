@@ -1,24 +1,44 @@
+
+---
+
+# DATA_DICTIONARY.md (replace entire file)
+
+```markdown
 # Data Dictionary
 
-## documents_latest.csv
-- `doc_id` (str): LCD or Article identifier (e.g., L392XX or 52840)
-- `doc_type` (str): `LCD` | `Article`
-- `title` (str): Document title
-- `contractor` (str): MAC/Contractor
-- `state` (str): State/Jurisdiction code(s)
-- `status` (str): A|R|F (Active/Retired/Future)
-- `source_url` (str): Link to the CMS MCD page
+## document_codes.csv
+Merged per‑document code rows from all shards.
 
-## document_codes_latest.csv
-- `article_id` (str): Article identifier
+- `document_type` (str): `LCD` | `Article`
+- `document_id` (str): CMS identifier (e.g., `L392XX`, `52840`)
 - `code_system` (str): `ICD10-CM` | `HCPCS/CPT` | `Revenue` | `Bill Type` | `HCPCS Modifier`
 - `code` (str): Code value
-- `description` (str): Human-readable description (if provided by API)
-- `coverage_flag` (str): `covered` | `noncovered` | `` (n/a)
+- `description` (str): Optional text from API
+- `coverage_flag` (str): `covered` | `noncovered` | `` (empty/n.a.)
 
-## changes_YYYY-MM.csv
+## document_nocodes.csv
+Documents fetched without any code rows this run.
+
+- `document_type` (str)
+- `document_id` (str)
+- Additional fetch/context columns may be present.
+
+## codes_normalized.csv
+Stable, analysis‑friendly view across **Articles & LCDs**.
+
+- `doc_type` (str): `LCD` | `Article`
+- `doc_id` (str)
+- `code_system` (str)
+- `code` (str)
+- `description` (str)
+- `coverage_flag` (str)
+
+## codes_changes.csv
+Day‑over‑day diff vs the previous release.
+
 - `change_type` (str): `Added` | `Removed` | `FlagChanged`
-- `article_id` (str)
+- `doc_type` (str)
+- `doc_id` (str)
 - `code_system` (str)
 - `code` (str)
 - `prev_flag` (str)
