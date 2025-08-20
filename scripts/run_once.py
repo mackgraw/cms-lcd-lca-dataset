@@ -1,247 +1,122 @@
-# scripts/run_once.py
 from __future__ import annotations
+import os, time, requests
+from typing import Any, Dict, List, Optional, Tuple
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
-import argparse, csv, os, zipfile
-from typing import Any, Dict, List, Mapping, Optional, Tuple
+BASE_URL = "https://api.coverage.cms.gov/v1"
+_HELLO_MSG = "Hello MCIM API Users!"
 
-from scripts.coverage_api import (
-    _env,
-    _debug,
-    ensure_license_acceptance,
-    list_final_lcds,
-    list_articles,
-    discover_ids_from_report_row,
-    get_codes_table_any,
-    get_icd10_covered_any,
-    get_icd10_noncovered_any,
-    get_hcpc_codes_any,
-    get_hcpc_modifiers_any,
-    get_revenue_codes_any,
-    get_bill_codes_any,
-)
+def _build_session() -> requests.Session:
+    s = requests.Session()
+    retries = Retry(
+        total=5, backoff_factor=0.5,
+        status_forcelist=(429, 500, 502, 503, 504),
+        allowed_methods=frozenset(["GET"]),
+        raise_on_status=False,
+    )
+    adapter = HTTPAdapter(max_retries=retries, pool_connections=20, pool_maxsize=40)
+    s.mount("https://", adapter); s.mount("http://", adapter)
+    s.headers.update({"Accept": "application/json"})
+    return s
 
-OUT_DIR = "dataset"
-OUT_CSV_CODES   = os.path.join(OUT_DIR, "document_codes_latest.csv")
-OUT_CSV_NOCODE  = os.path.join(OUT_DIR, "document_nocodes_latest.csv")
-OUT_ZIP_CODES   = os.path.join(OUT_DIR, "document_codes_latest.zip")
+_session = _build_session()
+_TOKEN: Optional[str] = None
+_TOKEN_EXP: float = 0.0
 
-def _mk_label(row: Mapping[str, Any]) -> str:
-    return row.get("document_display_id") or row.get("article_display_id") or row.get("document_id") or row.get("article_id") or row.get("id") or "?"
+def _full_url(path: str) -> str:
+    if path.startswith("http"): return path
+    if not path.startswith("/"): path = "/" + path
+    return BASE_URL + path
 
-def _mk_ids(kind: str, row: Mapping[str, Any]) -> Dict[str, Any]:
-    # Normalize identifiers for each kind; coverage_api getters accept either id or display id + optional version.
-    ids = discover_ids_from_report_row(row)
-    if kind == "LCD":
-        return {
-            "document_id": ids.get("document_id"),
-            "document_display_id": ids.get("document_display_id"),
-            "ver": ids.get("ver"),
-        }
-    else:  # Article
-        return {
-            "article_id": ids.get("article_id"),
-            "article_display_id": ids.get("article_display_id"),
-            "ver": ids.get("ver"),
-        }
+def ensure_license_acceptance(timeout: Optional[float] = None) -> None:
+    global _TOKEN, _TOKEN_EXP
+    url = _full_url("/metadata/license-agreement")
+    print(f"[DEBUG] GET {url} -> ...")
+    r = _session.get(url, timeout=timeout)
+    try: j = r.json()
+    except Exception: j = None
+    if r.status_code != 200:
+        raise RuntimeError(f"license-agreement {r.status_code}: {getattr(j,'text',j)}")
+    print(f"[DEBUG] GET {url} -> {r.status_code}; keys={list((j or {}).keys())}")
+    data = (j or {}).get("data", [])
+    if isinstance(data, list) and data and "Token" in data[0]:
+        _TOKEN = data[0]["Token"]
+        _TOKEN_EXP = time.time() + 55*60
+        print("[note] CMS license agreement accepted; session token cached.")
+    else:
+        _TOKEN = None; _TOKEN_EXP = 0.0
+        print("[note] CMS license agreement acknowledged (no token provided).")
 
-def _collect_for_ids(kind: str, ids: Dict[str, Any], timeout: int) -> List[Dict[str, Any]]:
-    rows: List[Dict[str, Any]] = []
+def _maybe_attach_token(headers: Dict[str, str]) -> Dict[str,str]:
+    global _TOKEN, _TOKEN_EXP
+    if _TOKEN and time.time() >= _TOKEN_EXP:
+        try: ensure_license_acceptance(timeout=float(os.getenv("COVERAGE_TIMEOUT") or 30))
+        except Exception as e: print(f"[warn] token refresh failed; proceeding without token: {e}")
+    if _TOKEN:
+        h=dict(headers); h["Authorization"]=f"Bearer {_TOKEN}"; return h
+    return headers
 
-    def extend(tag: str, fn):
-        got = fn(ids, timeout=timeout) or []
-        for r in got:
-            r["_endpoint"] = tag
-        rows.extend(got)
+def _get_json(method:str,path:str,params:Optional[Dict[str,Any]]=None,timeout:Optional[float]=None)->Dict[str,Any]:
+    url=_full_url(path); headers=_maybe_attach_token({})
+    r=_session.request(method=method.upper(),url=url,params=params or {},headers=headers,timeout=timeout)
+    if r.status_code in (401,403) and _TOKEN is not None:
+        ensure_license_acceptance(timeout=timeout)
+        headers=_maybe_attach_token({})
+        r=_session.request(method=method.upper(),url=url,params=params or {},headers=headers,timeout=timeout)
+    try:j=r.json()
+    except Exception:j={"text":r.text}
+    if r.status_code>=400:
+        msg=(j.get("message") if isinstance(j,dict) else None) or r.text
+        raise RuntimeError(f"{url} {r.status_code}: {msg}")
+    return j if isinstance(j,dict) else {}
 
-    if kind == "Article":
-        extend("/data/article/code-table",      get_codes_table_any)
-        extend("/data/article/icd10-covered",   get_icd10_covered_any)
-        extend("/data/article/icd10-noncovered",get_icd10_noncovered_any)
-        extend("/data/article/hcpc-modifier",   get_hcpc_modifiers_any)
-        extend("/data/article/revenue-code",    get_revenue_codes_any)
-        extend("/data/article/bill-codes",      get_bill_codes_any)
-        # Always include HCPC codes explicitly last (most important)
-        extend("/data/article/hcpc-code",       get_hcpc_codes_any)
-    else:  # LCD
-        # Several LCD endpoints are currently returning “Hello MCIM API Users!” 400s;
-        # coverage_api already “disables” those with a friendly note and returns [].
-        extend("/data/lcd/code-table",          get_codes_table_any)
-        extend("/data/lcd/icd10-covered",       get_icd10_covered_any)
-        extend("/data/lcd/icd10-noncovered",    get_icd10_noncovered_any)
-        extend("/data/lcd/hcpc-modifier",       get_hcpc_modifiers_any)
-        extend("/data/lcd/revenue-code",        get_revenue_codes_any)
-        extend("/data/lcd/bill-codes",          get_bill_codes_any)
-        extend("/data/lcd/hcpc-code",           get_hcpc_codes_any)
+# -------- reports ----------
+def fetch_local_reports(timeout:Optional[float]=None)->Tuple[List[dict],List[dict]]:
+    lcds=_get_json("GET","/reports/local-coverage-final-lcds",timeout=timeout).get("data",[])
+    arts=_get_json("GET","/reports/local-coverage-articles",timeout=timeout).get("data",[])
+    return (lcds if isinstance(lcds,list) else []),(arts if isinstance(arts,list) else [])
 
-    return rows
+# -------- Article harvesting ----------
+ARTICLE_ENDPOINTS=[
+  "/data/article/code-table","/data/article/icd10-covered","/data/article/icd10-noncovered",
+  "/data/article/hcpc-code","/data/article/hcpc-modifier","/data/article/revenue-code","/data/article/bill-codes"
+]
+def harvest_article_endpoints(article_row:dict,timeout:Optional[float]):
+    aid=int(article_row.get("article_id") or article_row.get("document_id") or 0)
+    ver=article_row.get("document_version") or article_row.get("ver")
+    disp=article_row.get("article_display_id") or article_row.get("document_display_id")
+    print(f"[DEBUG] [Article] {disp or aid}")
+    results={}
+    if not aid: return {},{"article_id":None,"article_display_id":disp,"document_version":ver}
+    params={"articleid":aid}; 
+    if ver: params["ver"]=ver
+    for ep in ARTICLE_ENDPOINTS:
+        try: data=_get_json("GET",ep,params=params,timeout=timeout).get("data",[])
+        except Exception as e: print(f"[DEBUG]   -> {ep} error: {e}"); data=[]
+        results[ep]=data
+    return results,{"article_id":aid,"article_display_id":disp,"document_version":ver}
 
-def _write_csv(path: str, rows: List[Dict[str, Any]]) -> None:
-    os.makedirs(OUT_DIR, exist_ok=True)
-    header: List[str] = []
-    seen = set()
-    for r in rows:
-        for k in r.keys():
-            if k not in seen:
-                seen.add(k)
-                header.append(k)
-    if not header:
-        header = ["_endpoint"]
-
-    with open(path, "w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=header, extrasaction="ignore")
-        w.writeheader()
-        for r in rows:
-            w.writerow(r)
-
-def _zip_codes_csv(csv_path: str, zip_path: str) -> None:
-    if not os.path.exists(csv_path):
-        return
-    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-        zf.write(csv_path, arcname=os.path.basename(csv_path))
-
-def _write_nocode_csv(path: str, rows: List[Dict[str, Any]]) -> None:
-    os.makedirs(OUT_DIR, exist_ok=True)
-    header = ["_kind", "_document_id", "_document_display_id", "_title"]
-    with open(path, "w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=header, extrasaction="ignore")
-        w.writeheader()
-        for r in rows:
-            w.writerow({k: r.get(k, "") for k in header})
-
-def _parse_args():
-    ap = argparse.ArgumentParser(description="Coverage harvest runner")
-    ap.add_argument("--file", help="Process a single document identifier")
-    ap.add_argument("--manifest", help="Path to newline-delimited list of document identifiers to process")
-    return ap.parse_known_args()
-
-def _load_manifest(path: str) -> List[str]:
-    from pathlib import Path
-    p = Path(path)
-    if not p.exists():
-        raise FileNotFoundError(f"Manifest not found: {p}")
-    return [ln.strip() for ln in p.read_text(encoding="utf-8").splitlines() if ln.strip()]
-
-def _id_keys(kind: str, row: Mapping[str, Any]) -> List[str]:
-    ids = _mk_ids(kind, row)
-    vals = [
-        ids.get("document_id"),
-        ids.get("document_display_id"),
-        ids.get("article_id"),
-        ids.get("article_display_id"),
-    ]
-    return [str(v) for v in vals if v not in (None, "")]
-
-def _select_work(work: List[Tuple[str, Dict[str, Any]]], allow_ids: Optional[set[str]]) -> List[Tuple[str, Dict[str, Any]]]:
-    if not allow_ids:
-        return work
-    out = []
-    for kind, row in work:
-        if any(k in allow_ids for k in _id_keys(kind, row)):
-            out.append((kind, row))
-    return out
-
-def _shard_filter(work: List[Tuple[str, Dict[str, Any]]], shard_index: int, shard_total: int) -> List[Tuple[str, Dict[str, Any]]]:
-    import hashlib
-    if shard_total <= 1:
-        return work
-    out: List[Tuple[str, Dict[str, Any]]] = []
-    for kind, row in work:
-        keys = _id_keys(kind, row)
-        key = (keys[0] if keys else "")
-        h = hashlib.md5(key.encode("utf-8")).hexdigest()
-        if int(h, 16) % shard_total == shard_index:
-            out.append((kind, row))
-    return out
-
-def main() -> None:
-    args, _ = _parse_args()
-
-    # Sharding (deterministic by ID)
-    SHARD_INDEX = int(os.environ.get("SHARD_INDEX", "0") or "0")
-    SHARD_TOTAL = int(os.environ.get("SHARD_TOTAL", "1") or "1")
-
-    # Filters and HTTP
-    STATES      = _env("COVERAGE_STATES")
-    STATUS      = _env("COVERAGE_STATUS")
-    CONTRACTORS = _env("COVERAGE_CONTRACTORS")
-    MAX_DOCS    = int(_env("COVERAGE_MAX_DOCS") or "0")
-    TIMEOUT     = int(_env("COVERAGE_TIMEOUT")  or "30")
-
-    # CMS license token (auto-renews when needed)
-    try:
-        ensure_license_acceptance(timeout=TIMEOUT)
-    except Exception as e:
-        print(f"[WARN] ensure_license_acceptance() failed: {e}. Continuing.", flush=True)
-
-    # Discover (Articles first so you see them in logs even if LCD endpoints are limited)
-    lcds = list_final_lcds(STATES, STATUS, CONTRACTORS, timeout=TIMEOUT)
-    arts = list_articles(STATES, STATUS, CONTRACTORS, timeout=TIMEOUT)
-    _debug(f"[DEBUG] discovered {len(lcds)} LCDs, {len(arts)} Articles (total {len(lcds)+len(arts)})")
-
-    work: List[Tuple[str, Dict[str, Any]]] = [("Article", a) for a in arts] + [("LCD", l) for l in lcds]
-
-    # Optional allowlist (single file or manifest)
-    allow_ids: Optional[set[str]] = None
-    if args.file and args.manifest:
-        raise SystemExit("--file and --manifest are mutually exclusive")
-    if args.file:
-        allow_ids = {args.file.strip()}
-    elif args.manifest:
-        allow_ids = set(_load_manifest(args.manifest))
-    if allow_ids:
-        work = _select_work(work, allow_ids)
-        _debug(f"[DEBUG] after allowlist: {len(work)} items")
-
-    # Only shard when we’re not allowlisting
-    if not allow_ids:
-        before = len(work)
-        work = _shard_filter(work, SHARD_INDEX, SHARD_TOTAL)
-        _debug(f"[DEBUG] shard {SHARD_INDEX}/{SHARD_TOTAL} -> {len(work)} of {before} items")
-
-    if MAX_DOCS and len(work) > MAX_DOCS:
-        work = work[:MAX_DOCS]
-
-    all_rows: List[Dict[str, Any]] = []
-    no_code_rows: List[Dict[str, Any]] = []
-
-    processed = 0
-    for idx, (kind, row) in enumerate(work, start=1):
-        _debug(f"[DEBUG] [{kind} {idx}/{len(work)}] {_mk_label(row)}")
-        ids = _mk_ids(kind, row)
-        _debug(f"[DEBUG]   ids for {kind}: {{ {', '.join(f'{k}={v}' for k,v in ids.items() if v)} }}")
-        try:
-            got = _collect_for_ids(kind, ids, TIMEOUT)
+# -------- LCD harvesting ----------
+_LCD_EP_SUPPORTED:Dict[str,Optional[bool]]={}
+LCD_ENDPOINTS=[
+  "/data/lcd/code-table","/data/lcd/icd10-covered","/data/lcd/icd10-noncovered",
+  "/data/lcd/hcpc-code","/data/lcd/hcpc-modifier","/data/lcd/revenue-code","/data/lcd/bill-codes"
+]
+def harvest_lcd_endpoints(lcd_row:dict,timeout:Optional[float]):
+    lid=int(lcd_row.get("lcd_id") or lcd_row.get("document_id") or 0)
+    ver=lcd_row.get("document_version") or lcd_row.get("ver")
+    disp=lcd_row.get("lcd_display_id") or lcd_row.get("document_display_id")
+    print(f"[DEBUG] [LCD] {disp or lid}")
+    if not lid: return {},{"lcd_id":None,"lcd_display_id":disp,"document_version":ver}
+    params={"lcdid":lid}; 
+    if ver: params["ver"]=ver
+    results={}
+    for ep in LCD_ENDPOINTS:
+        if _LCD_EP_SUPPORTED.get(ep) is False: continue
+        try:data=_get_json("GET",ep,params=params,timeout=timeout).get("data",[])
         except Exception as e:
-            _debug(f"[DEBUG]   -> collect errored: {e} (continue)")
-            got = []
-
-        if got:
-            for r in got:
-                r["_document_display_id"] = ids.get("document_display_id") or ids.get("article_display_id")
-                r["_document_id"]        = ids.get("document_id") or ids.get("article_id")
-                r["_kind"]               = kind
-                r["_title"]              = row.get("title") or row.get("name") or ""
-            _debug(f"        -> aggregated rows: {len(got)}")
-            all_rows.extend(got)
-        else:
-            _debug(f"        -> aggregated rows: 0")
-            no_code_rows.append({
-                "_kind": kind,
-                "_document_id": ids.get("document_id") or ids.get("article_id") or "",
-                "_document_display_id": ids.get("document_display_id") or ids.get("article_display_id") or "",
-                "_title": row.get("title") or row.get("name") or "",
-            })
-        processed += 1
-
-    # Write outputs (CSV + matching ZIP so workflows can upload either)
-    _write_csv(OUT_CSV_CODES, all_rows)
-    _zip_codes_csv(OUT_CSV_CODES, OUT_ZIP_CODES)
-    _write_nocode_csv(OUT_CSV_NOCODE, no_code_rows)
-
-    print(f"[SUMMARY] processed items: {processed}, total rows written: {len(all_rows)}")
-    print(f"[SUMMARY] CSV (codes): {OUT_CSV_CODES}")
-    print(f"[SUMMARY] ZIP (codes): {OUT_ZIP_CODES}")
-    print(f"[SUMMARY] CSV (no-code): {OUT_CSV_NOCODE}  (documents that yielded 0 rows)")
-
-if __name__ == "__main__":
-    main()
+            if _HELLO_MSG in str(e): _LCD_EP_SUPPORTED[ep]=False; print(f"[note] disabling {ep}"); data=[]
+            else: print(f"[DEBUG]   -> {ep} error: {e}"); data=[]
+        results[ep]=data
+    return results,{"lcd_id":lid,"lcd_display_id":disp,"document_version":ver}
