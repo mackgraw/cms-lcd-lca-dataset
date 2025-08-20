@@ -16,14 +16,14 @@ fi
 # Push feature branch first
 git push origin "${feature}"
 
-# Fast‑forward main, merge, and push
+# Fast-forward main, merge, and push
 git checkout main
 git pull origin main
-git merge --no-ff "${feature}" -m "merge: ${feature} into main"
+git merge --no-ff --no-edit "${feature}"   # <-- auto-accept default message
 git push origin main
 
 # Optional: delete feature branch locally and remotely
 git branch -d "${feature}" || true
 git push origin ":${feature}" || true
 
-echo "[ok] Merged ${feature} -> main"
+echo "[ok] Merged ${feature} -> main (auto commit message used)"
