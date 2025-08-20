@@ -1,8 +1,9 @@
-# Setup
+# CMS LCD/LCA Dataset (Daily Sharded Workflow)
 
-This project pulls **Local Coverage Determinations (LCDs)** and **Local Coverage Articles (LCAs)** from the CMS **Coverage API**, shards the workload, merges outputs, computes normalized + day‑over‑day changes, and publishes assets in a daily Release.
+This project pulls Medicare **Local Coverage Determinations (LCDs)** and **Local Coverage Articles (LCAs)** from the CMS **Coverage API**, shards the workload, merges outputs, normalizes codes, computes day-over-day changes, and publishes assets to a daily Release.
 
 ## Quick start (local)
+
 ```bash
 python -m venv .venv && source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
