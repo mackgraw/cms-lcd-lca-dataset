@@ -1,152 +1,196 @@
 # scripts/coverage_api.py
 
-from typing import Dict, Any, Optional, Tuple
+from __future__ import annotations
+
+import time
+from typing import Any, Dict, List, Optional
+
 import requests
-from requests import Response
 
-BASE = "https://api.coverage.cms.gov"
 
-def _debug(msg: str) -> None:
-    print(f"[DEBUG] {msg}")
+_BASE = "https://api.coverage.cms.gov"
+_SESSION: Optional[requests.Session] = None
+_BEARER: Optional[str] = None
+_TOKEN_TS: Optional[float] = None
 
-def _get(url: str, params: Optional[Dict[str, Any]] = None, timeout: Optional[int] = None) -> Response:
-    _debug(f"GET {url} -> ...")
-    resp = requests.get(url, params=params or {}, timeout=timeout)
-    # Log a short server message (first 120 chars) if present
+# The API says tokens last ~1 hour. Refresh a bit early to be safe.
+_TOKEN_TTL_SECONDS = 60 * 60
+_REFRESH_SKEW_SECONDS = 5 * 60  # refresh ~5 minutes early
+
+
+# -----------------------------
+# Session & token management
+# -----------------------------
+def get_session() -> requests.Session:
+    """Return a memoized requests.Session with standard headers."""
+    global _SESSION
+    if _SESSION is None:
+        s = requests.Session()
+        adapter = requests.adapters.HTTPAdapter(max_retries=3)
+        s.mount("https://", adapter)
+        s.mount("http://", adapter)
+        s.headers.update(
+            {
+                "Accept": "application/json",
+                "User-Agent": "cms-lcd-lca-dataset/harvester",
+            }
+        )
+        _SESSION = s
+    return _SESSION
+
+
+def _token_is_stale() -> bool:
+    """True if we should refresh the token due to age."""
+    if _TOKEN_TS is None:
+        return True
+    age = time.time() - _TOKEN_TS
+    return age >= (_TOKEN_TTL_SECONDS - _REFRESH_SKEW_SECONDS)
+
+
+def ensure_license_acceptance(timeout: Optional[int] = None) -> Optional[str]:
+    """
+    Call /v1/metadata/license-agreement to acknowledge the license
+    and install the returned bearer token on the session.
+    Returns the token, or None if the endpoint didn’t return one.
+    """
+    global _BEARER, _TOKEN_TS
+
+    s = get_session()
+    url = f"{_BASE}/v1/metadata/license-agreement"
+    print(f"[DEBUG] GET {url} -> ...")
+    r = s.get(url, timeout=timeout or 30)
+
+    # Try to parse JSON even on error; log useful bits.
     try:
-        j = resp.json()
-        if isinstance(j, dict):
-            keys = list(j.keys())
-            if 'message' in j:
-                _debug(f"GET {url} -> {resp.status_code}; keys={keys}; message={str(j['message'])[:120]}")
-            else:
-                _debug(f"GET {url} -> {resp.status_code}; keys={keys}")
-        else:
-            _debug(f"GET {url} -> {resp.status_code}")
+        payload = r.json()
     except Exception:
-        _debug(f"GET {url} -> {resp.status_code} (non-JSON)")
-    return resp
+        payload = {"meta": {"status": {"id": r.status_code, "message": r.reason}}, "data": []}
 
-def ensure_license_acceptance() -> None:
-    url = f"{BASE}/v1/metadata/license-agreement"
-    resp = _get(url)
-    # best-effort note
+    status = payload.get("meta", {}).get("status", {})
+    code = status.get("id", r.status_code)
+    print(f"[DEBUG] GET {url} -> {code}; keys={list(payload.keys())}")
+    # full payload can be noisy, but printing here has helped debugging:
+    print(f"[DEBUG] GET {url} -> {payload}; keys={list(payload.keys())}")
+
+    # Extract the token (if provided)
+    token = None
     try:
-        j = resp.json()
-        _debug(f"GET {url} -> {j}; keys={list(j.keys())}")
-        print("[note] CMS license agreement acknowledged (no token provided).")
+        data = payload.get("data") or []
+        if data and isinstance(data, list) and isinstance(data[0], dict):
+            token = data[0].get("Token")
     except Exception:
+        token = None
+
+    if token:
+        _BEARER = token
+        _TOKEN_TS = time.time()
+        s.headers["Authorization"] = f"Bearer {token}"
+        masked = token[:8] + "..." + token[-4:] if len(token) > 12 else "***"
+        print(f"[note] CMS license token acquired and installed (Bearer {masked}).")
+    else:
         print("[note] CMS license agreement acknowledged (no token provided).")
 
-# --- PARAM BUILDING (fixed) ---
+    return token
 
-def _version_from_ids(ids: Dict[str, Any]) -> Optional[str]:
-    """Normalize version field to API's 'ver'."""
-    # prefer explicit 'document_version' if present, else 'version'
-    v = ids.get("document_version") or ids.get("version")
-    if v is None:
-        return None
-    return str(v)
 
-def _article_params(ids: Dict[str, Any]) -> Dict[str, Any]:
-    """Only valid params for article data endpoints."""
-    params: Dict[str, Any] = {}
-    if "article_id" in ids and ids["article_id"]:
-        params["articleid"] = str(ids["article_id"])
-    ver = _version_from_ids(ids)
-    if ver is not None:
-        params["ver"] = ver
-    return params
-
-def _lcd_params(ids: Dict[str, Any]) -> Dict[str, Any]:
-    """Only valid params for LCD data endpoints."""
-    params: Dict[str, Any] = {}
-    if "lcd_id" in ids and ids["lcd_id"]:
-        params["lcdid"] = str(ids["lcd_id"])
-    ver = _version_from_ids(ids)
-    if ver is not None:
-        params["ver"] = ver
-    return params
-
-# --- GENERIC FETCHERS ---
-
-def fetch_article_data(path: str, ids: Dict[str, Any], timeout: Optional[int] = None) -> Tuple[int, Dict[str, Any]]:
+# -----------------------------
+# Low-level GET helpers
+# -----------------------------
+def _remap_short_params(p: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Fetch an article data endpoint with valid params.
-    path examples: '/v1/data/article/code-table', '/v1/data/article/hcpc-code', etc.
+    Optional convenience: map short names used in some call sites to API names.
+    Example: articleid -> article_id, ver -> document_version
     """
-    url = f"{BASE}{path}"
-    params = _article_params(ids)
-    if not params:
-        _debug(f"-> {path} with (no-params): skipping invalid param set for article endpoints")
-        return 200, {"meta": {"status": "ok"}, "data": []}
-    resp = _get(url, params=params, timeout=timeout)
-    if resp.status_code >= 400:
-        # keep going but surface the message
+    if not p:
+        return p
+    p = dict(p)  # copy
+    # Short -> API
+    if "articleid" in p:
+        p["article_id"] = p.pop("articleid")
+    if "lcdid" in p:
+        p["lcd_id"] = p.pop("lcdid")
+    if "docid" in p:
+        p["document_id"] = p.pop("docid")
+    if "docdisplay" in p:
+        p["document_display_id"] = p.pop("docdisplay")
+    if "ver" in p:
+        p["document_version"] = p.pop("ver")
+    return p
+
+
+def _maybe_log_server_message(payload: Dict[str, Any]) -> None:
+    # Print the first 120 chars of an API-level "message", when present
+    msg = payload.get("message")
+    if msg is not None:
+        print(f"[DEBUG]   server message: {str(msg)[:120]}")
+
+
+def _request_with_optional_refresh(
+    method: str, url: str, *, params: Optional[Dict[str, Any]], timeout: Optional[int]
+) -> requests.Response:
+    """
+    Make one request. If we get 401/403, refresh token and retry once.
+    Also refresh token if it's stale before we make the call.
+    """
+    s = get_session()
+
+    # Pre-emptive refresh if our token is stale/absent
+    if _token_is_stale():
         try:
-            msg = resp.json().get("message", "")
-        except Exception:
-            msg = ""
-        _debug(f"  -> {path} with {','.join([f'{k}={v}' for k,v in params.items()])}: {resp.status_code} for {url}: {msg[:120]} (continue)")
-        return resp.status_code, {"meta": {"status": "error"}, "data": []}
-    j = resp.json()
-    _debug(f"  page meta: {list(j.get('meta', {}).keys())}")
-    rows = j.get("data", [])
-    _debug(f"  -> {path} with {','.join([f'{k}={v}' for k,v in params.items()])}: {len(rows)} rows")
-    return resp.status_code, j
+            ensure_license_acceptance(timeout=timeout)
+        except Exception as e:
+            print(f"[warn] token refresh failed pre-request: {e!r}")
 
-def fetch_lcd_data(path: str, ids: Dict[str, Any], timeout: Optional[int] = None) -> Tuple[int, Dict[str, Any]]:
-    """
-    Fetch an LCD data endpoint with valid params.
-    path examples: '/v1/data/lcd/hcpc-code', '/v1/data/lcd/icd10-covered', etc.
-    """
-    url = f"{BASE}{path}"
-    params = _lcd_params(ids)
-    if not params:
-        _debug(f"-> {path} with (no-params): skipping invalid param set for lcd endpoints")
-        return 200, {"meta": {"status": "ok"}, "data": []}
-    resp = _get(url, params=params, timeout=timeout)
-    if resp.status_code >= 400:
+    # First attempt
+    r = s.request(method, url, params=params or {}, timeout=timeout or 30)
+
+    if r.status_code in (401, 403):
+        # Try a refresh and retry once
+        print(f"[DEBUG] {r.status_code} received; attempting token refresh and retry once.")
         try:
-            msg = resp.json().get("message", "")
-        except Exception:
-            msg = ""
-        _debug(f"  -> {path} with {','.join([f'{k}={v}' for k,v in params.items()])}: {resp.status_code} for {url}: {msg[:120]} (continue)")
-        return resp.status_code, {"meta": {"status": "error"}, "data": []}
-    j = resp.json()
-    _debug(f"  page meta: {list(j.get('meta', {}).keys())}")
-    rows = j.get("data", [])
-    _debug(f"  -> {path} with {','.join([f'{k}={v}' for k,v in params.items()])}: {len(rows)} rows")
-    return resp.status_code, j
+            ensure_license_acceptance(timeout=timeout)
+        except Exception as e:
+            print(f"[warn] token refresh failed after {r.status_code}: {e!r}")
+        r = s.request(method, url, params=params or {}, timeout=timeout or 30)
 
-# --- PUBLIC HELPERS USED BY run_once.py ---
+    return r
 
-def get_article_codes(ids: Dict[str, Any], timeout: Optional[int] = None):
-    return fetch_article_data("/v1/data/article/hcpc-code", ids, timeout)[1].get("data", [])
 
-def get_article_modifiers(ids: Dict[str, Any], timeout: Optional[int] = None):
-    return fetch_article_data("/v1/data/article/hcpc-modifier", ids, timeout)[1].get("data", [])
+def api_get(path: str, params: Optional[Dict[str, Any]] = None, timeout: Optional[int] = None) -> Dict[str, Any]:
+    """
+    GET wrapper that uses the shared session, includes Bearer auth,
+    logs useful bits, and returns the parsed JSON.
+    Raises for non-2xx after logging message (if present).
+    """
+    url = f"{_BASE}{path}" if not path.startswith("http") else path
+    p = _remap_short_params(params or {})
 
-def get_article_icd10_covered(ids: Dict[str, Any], timeout: Optional[int] = None):
-    return fetch_article_data("/v1/data/article/icd10-covered", ids, timeout)[1].get("data", [])
+    print(f"[DEBUG] GET {url} -> ...")
+    r = _request_with_optional_refresh("GET", url, params=p, timeout=timeout)
 
-def get_article_icd10_noncovered(ids: Dict[str, Any], timeout: Optional[int] = None):
-    return fetch_article_data("/v1/data/article/icd10-noncovered", ids, timeout)[1].get("data", [])
+    # Try JSON; if not JSON, raise on HTTP error then return empty dict.
+    try:
+        payload = r.json()
+    except Exception:
+        r.raise_for_status()
+        return {}
 
-def get_article_revenue_codes(ids: Dict[str, Any], timeout: Optional[int] = None):
-    return fetch_article_data("/v1/data/article/revenue-code", ids, timeout)[1].get("data", [])
+    # Log basics
+    meta = payload.get("meta", {})
+    status = meta.get("status", {})
+    code = status.get("id", r.status_code)
+    print(f"[DEBUG] GET {url} -> {code}; keys={list(payload.keys())}")
+    _maybe_log_server_message(payload)
 
-def get_article_bill_codes(ids: Dict[str, Any], timeout: Optional[int] = None):
-    return fetch_article_data("/v1/data/article/bill-codes", ids, timeout)[1].get("data", [])
+    # Raise if server says it's an error (e.g., 400) — caller may catch.
+    r.raise_for_status()
+    return payload
 
-def get_article_code_table(ids: Dict[str, Any], timeout: Optional[int] = None):
-    return fetch_article_data("/v1/data/article/code-table", ids, timeout)[1].get("data", [])
 
-def get_lcd_codes(ids: Dict[str, Any], timeout: Optional[int] = None):
-    return fetch_lcd_data("/v1/data/lcd/hcpc-code", ids, timeout)[1].get("data", [])
-
-def get_lcd_icd10_covered(ids: Dict[str, Any], timeout: Optional[int] = None):
-    return fetch_lcd_data("/v1/data/lcd/icd10-covered", ids, timeout)[1].get("data", [])
-
-def get_lcd_icd10_noncovered(ids: Dict[str, Any], timeout: Optional[int] = None):
-    return fetch_lcd_data("/v1/data/lcd/icd10-noncovered", ids, timeout)[1].get("data", [])
+def api_paginate(path: str, params: Optional[Dict[str, Any]] = None, timeout: Optional[int] = None) -> List[Dict[str, Any]]:
+    """
+    Simple paginator for endpoints that just return all rows in `data`.
+    (Most of the Coverage API's /v1/data/* endpoints behave this way.)
+    """
+    payload = api_get(path, params=params, timeout=timeout)
+    return list(payload.get("data") or [])

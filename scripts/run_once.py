@@ -276,6 +276,7 @@ def main() -> None:
     contractors = _env_list("COVERAGE_CONTRACTORS")
     max_docs = _env_int("COVERAGE_MAX_DOCS")
     timeout = _env_int("COVERAGE_TIMEOUT")
+    
 
     # Print the environment as the logs show
     print(f"[PY-ENV] COVERAGE_STATES = {','.join(states) if states else ''}")
@@ -285,7 +286,7 @@ def main() -> None:
     print(f"[PY-ENV] COVERAGE_TIMEOUT = {str(timeout) if timeout is not None else ''}")
 
     # License
-    ensure_license_acceptance()
+    ensure_license_acceptance(timeout=timeout)  
 
     # Reports
     _debug("trying /reports/local-coverage-final-lcds (no status)")
