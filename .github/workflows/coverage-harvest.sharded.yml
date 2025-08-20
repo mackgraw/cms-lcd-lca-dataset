@@ -28,7 +28,6 @@ permissions:
   contents: read
 
 jobs:
-  # Gate so we truly run at 06:00 ET regardless of DST
   time_gate:
     runs-on: ubuntu-latest
     outputs:
@@ -49,7 +48,6 @@ jobs:
             echo "Skipping: Local ET hour is $now_et_hour (not 06)."
           fi
 
-  # Build shard matrix from input (or default 4)
   compute_matrix:
     needs: [time_gate]
     if: needs.time_gate.outputs.run_now == 'true' || github.event_name == 'workflow_dispatch'
@@ -112,9 +110,6 @@ jobs:
         run: |
           set -euo pipefail
           echo "[env] SHARD_INDEX=${SHARD_INDEX} SHARD_TOTAL=${SHARD_TOTAL}"
-          # harvest_shard.py reads env vars; it writes:
-          # dataset/document_codes_shard_${SHARD_INDEX}_of_${SHARD_TOTAL}.csv
-          # dataset/document_nocodes_shard_${SHARD_INDEX}_of_${SHARD_TOTAL}.csv
           python -m scripts.harvest_shard
           echo "[ls] dataset after shard ${SHARD_INDEX}"
           ls -l dataset || true
@@ -123,19 +118,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          codes="dataset/document_codes_shard_${SHARD_INDEX}_of_${SHARD_TOTAL}.csv"
-          nocodes="dataset/document_nocodes_shard_${SHARD_INDEX}_of_${SHARD_TOTAL}.csv"
+          # Use GitHub expressions directly so we don't rely on shell env variables.
+          codes="dataset/document_codes_shard_${{ matrix.shard_index }}_of_${{ needs.compute_matrix.outputs.shard_total }}.csv"
+          nocodes="dataset/document_nocodes_shard_${{ matrix.shard_index }}_of_${{ needs.compute_matrix.outputs.shard_total }}.csv"
           missing=0
           for f in "$codes" "$nocodes"; do
             if [ ! -s "$f" ]; then
-              echo "::error file=$f::Expected shard output not found for shard $SHARD_INDEX of $SHARD_TOTAL"
+              echo "::error file=$f::Expected shard output not found for shard ${{ matrix.shard_index }} of ${{ needs.compute_matrix.outputs.shard_total }}"
               missing=1
             fi
           done
           if [ "$missing" -ne 0 ]; then
-            echo "Shard ${SHARD_INDEX}: required output files are missing"; exit 1
+            echo "Shard ${{ matrix.shard_index }}: required output files are missing"; exit 1
           fi
-          echo "[ok] shard ${SHARD_INDEX} produced:"
+          echo "[ok] shard ${{ matrix.shard_index }} produced:"
           ls -l "$codes" "$nocodes"
 
       - name: Upload shard artifacts
@@ -213,7 +209,6 @@ jobs:
           if gh release view --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release download --repo "$GITHUB_REPOSITORY" --pattern "codes_normalized.csv" --dir prev || true
           fi
-          # Create header-only baseline if nothing fetched
           if [ ! -s prev/codes_normalized.csv ]; then
             echo "doc_type,doc_id,code_system,code,description,coverage_flag" > prev/codes_normalized.csv
           fi
@@ -223,7 +218,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # This helper writes both dataset/codes_normalized.csv and dataset/codes_changes.csv
           python -m scripts.compute_changes dataset/document_codes.csv prev/codes_normalized.csv
           echo "[ls] dataset after compute_changes"; ls -l dataset
 
