@@ -1,196 +1,247 @@
 # scripts/run_once.py
 from __future__ import annotations
 
-import csv
-import json
-import os
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+import argparse, csv, os, zipfile
+from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 from scripts.coverage_api import (
+    _env,
+    _debug,
     ensure_license_acceptance,
-    fetch_local_reports,
-    harvest_article_endpoints,
-    harvest_lcd_endpoints,
+    list_final_lcds,
+    list_articles,
+    discover_ids_from_report_row,
+    get_codes_table_any,
+    get_icd10_covered_any,
+    get_icd10_noncovered_any,
+    get_hcpc_codes_any,
+    get_hcpc_modifiers_any,
+    get_revenue_codes_any,
+    get_bill_codes_any,
 )
 
-OUT_DIR = Path("dataset")
-LOG_DIR = Path(".harvest_logs")
-OUT_DIR.mkdir(parents=True, exist_ok=True)
-LOG_DIR.mkdir(parents=True, exist_ok=True)
+OUT_DIR = "dataset"
+OUT_CSV_CODES   = os.path.join(OUT_DIR, "document_codes_latest.csv")
+OUT_CSV_NOCODE  = os.path.join(OUT_DIR, "document_nocodes_latest.csv")
+OUT_ZIP_CODES   = os.path.join(OUT_DIR, "document_codes_latest.zip")
 
-CODES_CSV = OUT_DIR / "document_codes_latest.csv"
-NOCODES_CSV = OUT_DIR / "document_nocodes_latest.csv"
+def _mk_label(row: Mapping[str, Any]) -> str:
+    return row.get("document_display_id") or row.get("article_display_id") or row.get("document_id") or row.get("article_id") or row.get("id") or "?"
 
-FLUSH_EVERY = 250
+def _mk_ids(kind: str, row: Mapping[str, Any]) -> Dict[str, Any]:
+    # Normalize identifiers for each kind; coverage_api getters accept either id or display id + optional version.
+    ids = discover_ids_from_report_row(row)
+    if kind == "LCD":
+        return {
+            "document_id": ids.get("document_id"),
+            "document_display_id": ids.get("document_display_id"),
+            "ver": ids.get("ver"),
+        }
+    else:  # Article
+        return {
+            "article_id": ids.get("article_id"),
+            "article_display_id": ids.get("article_display_id"),
+            "ver": ids.get("ver"),
+        }
 
-def _env(name: str, default: Optional[str] = None) -> Optional[str]:
-    val = os.getenv(name)
-    if val is None or val.strip() == "":
-        return default
-    return val.strip()
+def _collect_for_ids(kind: str, ids: Dict[str, Any], timeout: int) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
 
-def _env_int(name: str, default: Optional[int]) -> Optional[int]:
-    v = _env(name, None)
-    if v is None:
-        return default
-    try:
-        return int(v)
-    except Exception:
-        return default
+    def extend(tag: str, fn):
+        got = fn(ids, timeout=timeout) or []
+        for r in got:
+            r["_endpoint"] = tag
+        rows.extend(got)
 
-def _print_env():
-    print(f"[PY-ENV] COVERAGE_STATES = {_env('COVERAGE_STATES', '')}")
-    print(f"[PY-ENV] COVERAGE_STATUS = {_env('COVERAGE_STATUS', '')}")
-    print(f"[PY-ENV] COVERAGE_CONTRACTORS = {_env('COVERAGE_CONTRACTORS', '')} ")
-    print(f"[PY-ENV] COVERAGE_MAX_DOCS = {_env('COVERAGE_MAX_DOCS', '')}")
-    print(f"[PY-ENV] COVERAGE_TIMEOUT = {_env('COVERAGE_TIMEOUT', '30')}")
+    if kind == "Article":
+        extend("/data/article/code-table",      get_codes_table_any)
+        extend("/data/article/icd10-covered",   get_icd10_covered_any)
+        extend("/data/article/icd10-noncovered",get_icd10_noncovered_any)
+        extend("/data/article/hcpc-modifier",   get_hcpc_modifiers_any)
+        extend("/data/article/revenue-code",    get_revenue_codes_any)
+        extend("/data/article/bill-codes",      get_bill_codes_any)
+        # Always include HCPC codes explicitly last (most important)
+        extend("/data/article/hcpc-code",       get_hcpc_codes_any)
+    else:  # LCD
+        # Several LCD endpoints are currently returning “Hello MCIM API Users!” 400s;
+        # coverage_api already “disables” those with a friendly note and returns [].
+        extend("/data/lcd/code-table",          get_codes_table_any)
+        extend("/data/lcd/icd10-covered",       get_icd10_covered_any)
+        extend("/data/lcd/icd10-noncovered",    get_icd10_noncovered_any)
+        extend("/data/lcd/hcpc-modifier",       get_hcpc_modifiers_any)
+        extend("/data/lcd/revenue-code",        get_revenue_codes_any)
+        extend("/data/lcd/bill-codes",          get_bill_codes_any)
+        extend("/data/lcd/hcpc-code",           get_hcpc_codes_any)
 
-def _open_csv_with_header(path: Path, header: List[str]):
-    new_file = not path.exists()
-    f = path.open("a", newline="", encoding="utf-8")
-    w = csv.DictWriter(f, fieldnames=header)
-    if new_file:
-        w.writeheader()
-    return f, w
+    return rows
 
-def _summarize_counts(by_endpoint: Dict[str, List[dict]]) -> Tuple[Dict[str, int], int]:
-    counts = {ep: (len(rows) if isinstance(rows, list) else 0) for ep, rows in by_endpoint.items()}
-    total = sum(counts.values())
-    return counts, total
-
-def _write_code_rows(writer: csv.DictWriter, doc_type: str, meta: dict, endpoint: str, rows: List[dict], display_id_fallback: str):
+def _write_csv(path: str, rows: List[Dict[str, Any]]) -> None:
+    os.makedirs(OUT_DIR, exist_ok=True)
+    header: List[str] = []
+    seen = set()
     for r in rows:
-        writer.writerow(
-            {
-                "document_type": doc_type,
-                "document_id": meta.get("lcd_id") if doc_type == "LCD" else meta.get("article_id"),
-                "document_display_id": (
-                    (meta.get("lcd_display_id") if doc_type == "LCD" else meta.get("article_display_id"))
-                    or display_id_fallback
-                ),
-                "document_version": meta.get("document_version"),
-                "endpoint": endpoint,
-                "row_json": json.dumps(r, ensure_ascii=False),
-            }
-        )
+        for k in r.keys():
+            if k not in seen:
+                seen.add(k)
+                header.append(k)
+    if not header:
+        header = ["_endpoint"]
+
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=header, extrasaction="ignore")
+        w.writeheader()
+        for r in rows:
+            w.writerow(r)
+
+def _zip_codes_csv(csv_path: str, zip_path: str) -> None:
+    if not os.path.exists(csv_path):
+        return
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.write(csv_path, arcname=os.path.basename(csv_path))
+
+def _write_nocode_csv(path: str, rows: List[Dict[str, Any]]) -> None:
+    os.makedirs(OUT_DIR, exist_ok=True)
+    header = ["_kind", "_document_id", "_document_display_id", "_title"]
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=header, extrasaction="ignore")
+        w.writeheader()
+        for r in rows:
+            w.writerow({k: r.get(k, "") for k in header})
+
+def _parse_args():
+    ap = argparse.ArgumentParser(description="Coverage harvest runner")
+    ap.add_argument("--file", help="Process a single document identifier")
+    ap.add_argument("--manifest", help="Path to newline-delimited list of document identifiers to process")
+    return ap.parse_known_args()
+
+def _load_manifest(path: str) -> List[str]:
+    from pathlib import Path
+    p = Path(path)
+    if not p.exists():
+        raise FileNotFoundError(f"Manifest not found: {p}")
+    return [ln.strip() for ln in p.read_text(encoding="utf-8").splitlines() if ln.strip()]
+
+def _id_keys(kind: str, row: Mapping[str, Any]) -> List[str]:
+    ids = _mk_ids(kind, row)
+    vals = [
+        ids.get("document_id"),
+        ids.get("document_display_id"),
+        ids.get("article_id"),
+        ids.get("article_display_id"),
+    ]
+    return [str(v) for v in vals if v not in (None, "")]
+
+def _select_work(work: List[Tuple[str, Dict[str, Any]]], allow_ids: Optional[set[str]]) -> List[Tuple[str, Dict[str, Any]]]:
+    if not allow_ids:
+        return work
+    out = []
+    for kind, row in work:
+        if any(k in allow_ids for k in _id_keys(kind, row)):
+            out.append((kind, row))
+    return out
+
+def _shard_filter(work: List[Tuple[str, Dict[str, Any]]], shard_index: int, shard_total: int) -> List[Tuple[str, Dict[str, Any]]]:
+    import hashlib
+    if shard_total <= 1:
+        return work
+    out: List[Tuple[str, Dict[str, Any]]] = []
+    for kind, row in work:
+        keys = _id_keys(kind, row)
+        key = (keys[0] if keys else "")
+        h = hashlib.md5(key.encode("utf-8")).hexdigest()
+        if int(h, 16) % shard_total == shard_index:
+            out.append((kind, row))
+    return out
 
 def main() -> None:
-    _print_env()
+    args, _ = _parse_args()
 
-    timeout = float(_env("COVERAGE_TIMEOUT", "30"))
-    max_docs = _env_int("COVERAGE_MAX_DOCS", None)
+    # Sharding (deterministic by ID)
+    SHARD_INDEX = int(os.environ.get("SHARD_INDEX", "0") or "0")
+    SHARD_TOTAL = int(os.environ.get("SHARD_TOTAL", "1") or "1")
 
-    ensure_license_acceptance(timeout=timeout)
+    # Filters and HTTP
+    STATES      = _env("COVERAGE_STATES")
+    STATUS      = _env("COVERAGE_STATUS")
+    CONTRACTORS = _env("COVERAGE_CONTRACTORS")
+    MAX_DOCS    = int(_env("COVERAGE_MAX_DOCS") or "0")
+    TIMEOUT     = int(_env("COVERAGE_TIMEOUT")  or "30")
 
-    lcds, articles = fetch_local_reports(timeout=timeout)
-    total_lcds = len(lcds if isinstance(lcds, list) else [])
-    total_articles = len(articles if isinstance(articles, list) else [])
-    print(f"[DEBUG] discovered {total_lcds} LCDs, {total_articles} Articles (total {total_lcds + total_articles})")
+    # CMS license token (auto-renews when needed)
+    try:
+        ensure_license_acceptance(timeout=TIMEOUT)
+    except Exception as e:
+        print(f"[WARN] ensure_license_acceptance() failed: {e}. Continuing.", flush=True)
 
-    if max_docs is not None and max_docs > 0:
-        lcds = lcds[: max(0, min(max_docs, len(lcds)))]
-        articles = articles[: max(0, min(max_docs, len(articles)))]
+    # Discover (Articles first so you see them in logs even if LCD endpoints are limited)
+    lcds = list_final_lcds(STATES, STATUS, CONTRACTORS, timeout=TIMEOUT)
+    arts = list_articles(STATES, STATUS, CONTRACTORS, timeout=TIMEOUT)
+    _debug(f"[DEBUG] discovered {len(lcds)} LCDs, {len(arts)} Articles (total {len(lcds)+len(arts)})")
 
-    print(f"[DEBUG] processing {len(lcds)} LCDs and {len(articles)} Articles")
+    work: List[Tuple[str, Dict[str, Any]]] = [("Article", a) for a in arts] + [("LCD", l) for l in lcds]
 
-    codes_f, codes_w = _open_csv_with_header(
-        CODES_CSV,
-        [
-            "document_type",
-            "document_id",
-            "document_display_id",
-            "document_version",
-            "endpoint",
-            "row_json",
-        ],
-    )
-    nocodes_f, nocodes_w = _open_csv_with_header(
-        NOCODES_CSV,
-        ["document_type", "document_id", "document_display_id", "document_version", "reason"],
-    )
+    # Optional allowlist (single file or manifest)
+    allow_ids: Optional[set[str]] = None
+    if args.file and args.manifest:
+        raise SystemExit("--file and --manifest are mutually exclusive")
+    if args.file:
+        allow_ids = {args.file.strip()}
+    elif args.manifest:
+        allow_ids = set(_load_manifest(args.manifest))
+    if allow_ids:
+        work = _select_work(work, allow_ids)
+        _debug(f"[DEBUG] after allowlist: {len(work)} items")
+
+    # Only shard when we’re not allowlisting
+    if not allow_ids:
+        before = len(work)
+        work = _shard_filter(work, SHARD_INDEX, SHARD_TOTAL)
+        _debug(f"[DEBUG] shard {SHARD_INDEX}/{SHARD_TOTAL} -> {len(work)} of {before} items")
+
+    if MAX_DOCS and len(work) > MAX_DOCS:
+        work = work[:MAX_DOCS]
+
+    all_rows: List[Dict[str, Any]] = []
+    no_code_rows: List[Dict[str, Any]] = []
 
     processed = 0
-    wrote_rows = 0
-
-    try:
-        # LCDs
-        for idx, lcd in enumerate(lcds, start=1):
-            disp = lcd.get("lcd_display_id") or lcd.get("lcdDisplayId") or lcd.get("document_display_id") or lcd.get("documentDisplayId")
-            print(f"[DEBUG] [LCD {idx}/{len(lcds)}] {disp}")
-            by_ep, meta = harvest_lcd_endpoints(lcd, timeout=timeout)
-
-            counts, total = _summarize_counts(by_ep)
-            nonzero = ", ".join(f"{k.split('/')[-1]}={v}" for k, v in counts.items() if v)
-            print(f"[sum] {disp}: total={total}" + (f" ({nonzero})" if nonzero else ""))
-
-            if total > 0:
-                for ep, rows in by_ep.items():
-                    if not rows:
-                        continue
-                    _write_code_rows(codes_w, "LCD", meta, ep, rows, disp or "")
-                    wrote_rows += len(rows)
-            else:
-                nocodes_w.writerow(
-                    {
-                        "document_type": "LCD",
-                        "document_id": meta.get("lcd_id"),
-                        "document_display_id": meta.get("lcd_display_id") or disp,
-                        "document_version": meta.get("document_version"),
-                        "reason": "no rows from any supported LCD data endpoint",
-                    }
-                )
-
-            processed += 1
-            if processed % FLUSH_EVERY == 0:
-                codes_f.flush(); nocodes_f.flush()
-                os.fsync(codes_f.fileno()); os.fsync(nocodes_f.fileno())
-                print(f"[note] flushed CSVs at {processed} documents (rows so far: {wrote_rows})")
-
-        # Articles
-        for idx, art in enumerate(articles, start=1):
-            disp = art.get("article_display_id") or art.get("articleDisplayId") or art.get("document_display_id") or art.get("documentDisplayId")
-            print(f"[DEBUG] [Article {idx}/{len(articles)}] {disp}")
-            by_ep, meta = harvest_article_endpoints(art, timeout=timeout)
-
-            counts, total = _summarize_counts(by_ep)
-            nonzero = ", ".join(f"{k.split('/')[-1]}={v}" for k, v in counts.items() if v)
-            print(f"[sum] {disp}: total={total}" + (f" ({nonzero})" if nonzero else ""))
-
-            if total > 0:
-                for ep, rows in by_ep.items():
-                    if not rows:
-                        continue
-                    _write_code_rows(codes_w, "Article", meta, ep, rows, disp or "")
-                    wrote_rows += len(rows)
-            else:
-                nocodes_w.writerow(
-                    {
-                        "document_type": "Article",
-                        "document_id": meta.get("article_id"),
-                        "document_display_id": meta.get("article_display_id") or disp,
-                        "document_version": meta.get("document_version"),
-                        "reason": "no rows from any data endpoint",
-                    }
-                )
-
-            processed += 1
-            if processed % FLUSH_EVERY == 0:
-                codes_f.flush(); nocodes_f.flush()
-                os.fsync(codes_f.fileno()); os.fsync(nocodes_f.fileno())
-                print(f"[note] flushed CSVs at {processed} documents (rows so far: {wrote_rows})")
-
-    finally:
-        codes_f.flush(); nocodes_f.flush()
+    for idx, (kind, row) in enumerate(work, start=1):
+        _debug(f"[DEBUG] [{kind} {idx}/{len(work)}] {_mk_label(row)}")
+        ids = _mk_ids(kind, row)
+        _debug(f"[DEBUG]   ids for {kind}: {{ {', '.join(f'{k}={v}' for k,v in ids.items() if v)} }}")
         try:
-            os.fsync(codes_f.fileno()); os.fsync(nocodes_f.fileno())
-        except Exception:
-            pass
-        codes_f.close(); nocodes_f.close()
+            got = _collect_for_ids(kind, ids, TIMEOUT)
+        except Exception as e:
+            _debug(f"[DEBUG]   -> collect errored: {e} (continue)")
+            got = []
 
-    print(f"[note] Wrote {wrote_rows} code rows to {CODES_CSV}")
-    print(f"[note] Completed. See {NOCODES_CSV} for documents with zero rows.")
-    # Done
+        if got:
+            for r in got:
+                r["_document_display_id"] = ids.get("document_display_id") or ids.get("article_display_id")
+                r["_document_id"]        = ids.get("document_id") or ids.get("article_id")
+                r["_kind"]               = kind
+                r["_title"]              = row.get("title") or row.get("name") or ""
+            _debug(f"        -> aggregated rows: {len(got)}")
+            all_rows.extend(got)
+        else:
+            _debug(f"        -> aggregated rows: 0")
+            no_code_rows.append({
+                "_kind": kind,
+                "_document_id": ids.get("document_id") or ids.get("article_id") or "",
+                "_document_display_id": ids.get("document_display_id") or ids.get("article_display_id") or "",
+                "_title": row.get("title") or row.get("name") or "",
+            })
+        processed += 1
+
+    # Write outputs (CSV + matching ZIP so workflows can upload either)
+    _write_csv(OUT_CSV_CODES, all_rows)
+    _zip_codes_csv(OUT_CSV_CODES, OUT_ZIP_CODES)
+    _write_nocode_csv(OUT_CSV_NOCODE, no_code_rows)
+
+    print(f"[SUMMARY] processed items: {processed}, total rows written: {len(all_rows)}")
+    print(f"[SUMMARY] CSV (codes): {OUT_CSV_CODES}")
+    print(f"[SUMMARY] ZIP (codes): {OUT_ZIP_CODES}")
+    print(f"[SUMMARY] CSV (no-code): {OUT_CSV_NOCODE}  (documents that yielded 0 rows)")
 
 if __name__ == "__main__":
     main()

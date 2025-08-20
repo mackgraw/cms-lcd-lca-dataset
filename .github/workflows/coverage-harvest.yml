@@ -1,3 +1,4 @@
+# .github/workflows/coverage-harvest.yml
 name: Coverage Harvest
 
 on:
@@ -45,12 +46,19 @@ jobs:
           python -m scripts.run_once 2>&1 | tee .harvest_logs/run_once.log
           test ${PIPESTATUS[0]} -eq 0
 
-      - name: Upload dataset (codes)
+      - name: Upload dataset (codes CSV)
         uses: actions/upload-artifact@v4
         with:
-          name: document_codes_latest
-          path: dataset/document_codes_latest.zip
+          name: document_codes_latest_csv
+          path: dataset/document_codes_latest.csv
           if-no-files-found: error
+
+      - name: Upload dataset (codes ZIP)
+        uses: actions/upload-artifact@v4
+        with:
+          name: document_codes_latest_zip
+          path: dataset/document_codes_latest.zip
+          if-no-files-found: warn
 
       - name: Upload dataset (no codes)
         uses: actions/upload-artifact@v4

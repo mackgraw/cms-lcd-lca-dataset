@@ -1,7 +1,8 @@
+# .github/workflows/coverage-harvest.sharded.yml
 name: Coverage Harvest (Sharded)
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: {}
   schedule:
     - cron: "0 7 * * *"
 
@@ -12,8 +13,6 @@ concurrency:
 jobs:
   harvest:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -38,15 +37,15 @@ jobs:
             pip install requests tenacity pandas pyyaml
           fi
 
-      - name: Run shard
+      - name: Run shard ${{ matrix.shard }}/${{ matrix.total }}
         env:
+          SHARD_INDEX: ${{ matrix.shard }}
+          SHARD_TOTAL: ${{ matrix.total }}
           COVERAGE_STATES:      ${{ vars.COVERAGE_STATES }}
           COVERAGE_STATUS:      ${{ vars.COVERAGE_STATUS }}
           COVERAGE_CONTRACTORS: ${{ vars.COVERAGE_CONTRACTORS }}
           COVERAGE_MAX_DOCS:    ${{ vars.COVERAGE_MAX_DOCS }}
           COVERAGE_TIMEOUT:     ${{ vars.COVERAGE_TIMEOUT }}
-          COVERAGE_SHARD_INDEX: ${{ matrix.shard }}
-          COVERAGE_SHARD_TOTAL: ${{ matrix.total }}
         run: |
           mkdir -p .harvest_logs dataset
           python -m scripts.run_once 2>&1 | tee .harvest_logs/shard-${{ matrix.shard }}.log
@@ -60,11 +59,19 @@ jobs:
           path: .harvest_logs/shard-${{ matrix.shard }}.log
           if-no-files-found: error
 
-      - name: Upload shard dataset (codes)
+      - name: Upload shard dataset (codes CSV)
         if: success() || failure()
         uses: actions/upload-artifact@v4
         with:
-          name: document_codes_shard_${{ matrix.shard }}
+          name: document_codes_shard_${{ matrix.shard }}_csv
+          path: dataset/document_codes_latest.csv
+          if-no-files-found: warn
+
+      - name: Upload shard dataset (codes ZIP)
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: document_codes_shard_${{ matrix.shard }}_zip
           path: dataset/document_codes_latest.zip
           if-no-files-found: warn
 
