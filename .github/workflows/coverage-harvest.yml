@@ -1,76 +1,78 @@
-# .github/workflows/coverage-harvest.yml
-name: Coverage Harvest
+name: Coverage Harvest (single)
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 7 * * *"
-
-concurrency:
-  group: coverage-harvest
-  cancel-in-progress: false
+    - cron: "25 6 * * *" # daily at 06:25 UTC – tweak as you like
 
 jobs:
   harvest:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
+    timeout-minutes: 360
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+          restore-keys: ${{ runner.os }}-pip-
+
+      - name: Install deps
         run: |
           python -m pip install --upgrade pip
+          # If you have requirements.txt, prefer that:
           if [ -f requirements.txt ]; then
             pip install -r requirements.txt
           else
-            pip install requests tenacity pandas pyyaml
+            pip install requests pandas pyyaml tenacity pydantic typing-extensions python-dateutil
           fi
 
-      - name: Run harvest
+      - name: Prepare dirs
+        run: mkdir -p .harvest_logs dataset
+
+      - name: Run harvest (single)
+        run: python -m scripts.run_once
         env:
           COVERAGE_STATES:      ${{ vars.COVERAGE_STATES }}
           COVERAGE_STATUS:      ${{ vars.COVERAGE_STATUS }}
           COVERAGE_CONTRACTORS: ${{ vars.COVERAGE_CONTRACTORS }}
           COVERAGE_MAX_DOCS:    ${{ vars.COVERAGE_MAX_DOCS }}
           COVERAGE_TIMEOUT:     ${{ vars.COVERAGE_TIMEOUT }}
+
+      - name: Zip outputs
         run: |
-          mkdir -p .harvest_logs dataset
-          python -m scripts.run_once 2>&1 | tee .harvest_logs/run_once.log
-          test ${PIPESTATUS[0]} -eq 0
+          cd dataset
+          zip -9 ../document_codes_latest.zip document_codes_latest.csv || true
+          zip -9 ../document_nocodes_latest.zip document_nocodes_latest.csv || true
+          cd ..
+          zip -9 harvest-log.zip .harvest_logs/* || true
 
-      - name: Upload dataset (codes CSV)
+      - name: Upload dataset (codes)
         uses: actions/upload-artifact@v4
         with:
-          name: document_codes_latest_csv
-          path: dataset/document_codes_latest.csv
-          if-no-files-found: error
+          name: document_codes_latest
+          path: document_codes_latest.zip
+          if-no-files-found: ignore
 
-      - name: Upload dataset (codes ZIP)
-        uses: actions/upload-artifact@v4
-        with:
-          name: document_codes_latest_zip
-          path: dataset/document_codes_latest.zip
-          if-no-files-found: warn
-
-      - name: Upload dataset (no codes)
+      - name: Upload dataset (nocodes)
         uses: actions/upload-artifact@v4
         with:
           name: document_nocodes_latest
-          path: dataset/document_nocodes_latest.csv
-          if-no-files-found: warn
+          path: document_nocodes_latest.zip
+          if-no-files-found: ignore
 
-      - name: Upload run log
-        if: always()
+      - name: Upload logs
         uses: actions/upload-artifact@v4
         with:
           name: harvest-log
-          path: .harvest_logs/run_once.log
-          if-no-files-found: error
+          path: harvest-log.zip
+          if-no-files-found: ignore
