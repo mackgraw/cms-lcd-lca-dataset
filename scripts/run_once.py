@@ -22,7 +22,7 @@ LOG_DIR.mkdir(parents=True, exist_ok=True)
 CODES_CSV = OUT_DIR / "document_codes_latest.csv"
 NOCODES_CSV = OUT_DIR / "document_nocodes_latest.csv"
 
-FLUSH_EVERY = 250  # flush every N documents processed across both types
+FLUSH_EVERY = 250
 
 def _env(name: str, default: Optional[str] = None) -> Optional[str]:
     val = os.getenv(name)
@@ -81,10 +81,8 @@ def main() -> None:
     timeout = float(_env("COVERAGE_TIMEOUT", "30"))
     max_docs = _env_int("COVERAGE_MAX_DOCS", None)
 
-    # license/token (auto-refresh lives inside coverage_api)
     ensure_license_acceptance(timeout=timeout)
 
-    # fetch reports
     lcds, articles = fetch_local_reports(timeout=timeout)
     total_lcds = len(lcds if isinstance(lcds, list) else [])
     total_articles = len(articles if isinstance(articles, list) else [])
@@ -116,7 +114,7 @@ def main() -> None:
     wrote_rows = 0
 
     try:
-        # -------- LCDs --------
+        # LCDs
         for idx, lcd in enumerate(lcds, start=1):
             disp = lcd.get("lcd_display_id") or lcd.get("lcdDisplayId") or lcd.get("document_display_id") or lcd.get("documentDisplayId")
             print(f"[DEBUG] [LCD {idx}/{len(lcds)}] {disp}")
@@ -139,7 +137,7 @@ def main() -> None:
                         "document_id": meta.get("lcd_id"),
                         "document_display_id": meta.get("lcd_display_id") or disp,
                         "document_version": meta.get("document_version"),
-                        "reason": "no rows from any data endpoint",
+                        "reason": "no rows from any supported LCD data endpoint",
                     }
                 )
 
@@ -149,7 +147,7 @@ def main() -> None:
                 os.fsync(codes_f.fileno()); os.fsync(nocodes_f.fileno())
                 print(f"[note] flushed CSVs at {processed} documents (rows so far: {wrote_rows})")
 
-        # -------- Articles --------
+        # Articles
         for idx, art in enumerate(articles, start=1):
             disp = art.get("article_display_id") or art.get("articleDisplayId") or art.get("document_display_id") or art.get("documentDisplayId")
             print(f"[DEBUG] [Article {idx}/{len(articles)}] {disp}")
@@ -192,7 +190,7 @@ def main() -> None:
 
     print(f"[note] Wrote {wrote_rows} code rows to {CODES_CSV}")
     print(f"[note] Completed. See {NOCODES_CSV} for documents with zero rows.")
-    # (We no longer print a derived "no-code count" since some documents may produce both types across runs.)
+    # Done
 
 if __name__ == "__main__":
     main()

@@ -10,8 +10,8 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 BASE_URL = "https://api.coverage.cms.gov/v1"
+_HELLO_MSG = "Hello MCIM API Users!"
 
-# ---------------- HTTP session w/ retries ----------------
 def _build_session() -> requests.Session:
     s = requests.Session()
     retries = Retry(
@@ -29,9 +29,9 @@ def _build_session() -> requests.Session:
 
 _session = _build_session()
 
-# ---------------- License / token cache ----------------
+# ---------- license token ----------
 _TOKEN: Optional[str] = None
-_TOKEN_EXP: float = 0.0  # epoch seconds
+_TOKEN_EXP: float = 0.0
 
 def _full_url(path: str) -> str:
     if path.startswith("http://") or path.startswith("https://"):
@@ -41,10 +41,6 @@ def _full_url(path: str) -> str:
     return BASE_URL + path
 
 def ensure_license_acceptance(timeout: Optional[float] = None) -> None:
-    """
-    Accept license if required. If response returns a short‑lived Token, cache it
-    for ~55 minutes (API notes ~1 hour).
-    """
     global _TOKEN, _TOKEN_EXP
     url = _full_url("/metadata/license-agreement")
     print(f"[DEBUG] GET {url} -> ...")
@@ -100,11 +96,8 @@ def _get_json(method: str, path: str, params: Optional[Dict[str, Any]] = None, t
         raise RuntimeError(f"{url} {r.status_code}: {msg}")
     return j if isinstance(j, dict) else {}
 
-# ---------------- Reports ----------------
+# ---------- reports ----------
 def fetch_local_reports(timeout: Optional[float] = None) -> Tuple[List[dict], List[dict]]:
-    """
-    Return (lcds, articles) from the two 'local-coverage' report endpoints.
-    """
     lcds_url = "/reports/local-coverage-final-lcds"
     arts_url = "/reports/local-coverage-articles"
 
@@ -117,7 +110,7 @@ def fetch_local_reports(timeout: Optional[float] = None) -> Tuple[List[dict], Li
     arts = j2.get("data", []) if isinstance(j2, dict) else []
     return (lcds if isinstance(lcds, list) else []), (arts if isinstance(arts, list) else [])
 
-# ---------------- Article data helpers ----------------
+# ---------- Article harvesting ----------
 ARTICLE_ENDPOINTS = [
     "/data/article/code-table",
     "/data/article/icd10-covered",
@@ -128,19 +121,7 @@ ARTICLE_ENDPOINTS = [
     "/data/article/bill-codes",
 ]
 
-def _try_article_param_sets(article_id: Optional[int], document_version: Optional[int]) -> List[Dict[str, Any]]:
-    """Prefer versioned queries; fallback to unversioned ONLY on HTTP error."""
-    aid = int(article_id) if (article_id is not None and str(article_id).isdigit()) else None
-    ver = int(document_version) if (document_version is not None and str(document_version).isdigit()) else None
-    if not aid:
-        return []
-    return [{"articleid": aid, **({"ver": ver} if ver else {})}]
-
 def _collect_endpoint_rows(path: str, primary_params: Dict[str, Any], timeout: Optional[float]) -> List[dict]:
-    """
-    Shared collector for article/LCD endpoints: try versioned (if present);
-    if HTTP error and 'ver' was set, retry unversioned.
-    """
     short = _full_url(path)[len(BASE_URL):]
     try:
         j = _get_json("GET", path, params=primary_params, timeout=timeout)
@@ -153,7 +134,8 @@ def _collect_endpoint_rows(path: str, primary_params: Dict[str, Any], timeout: O
     except RuntimeError as e:
         shown = ",".join(f"{k}={v}" for k, v in primary_params.items()) or "(no-params)"
         print(f"[DEBUG]   -> {path} with {shown}: {e}")
-        if "ver" in primary_params:
+        if "ver" in primary_params and " 400:" in str(e):
+            # retry unversioned only if we had a version and the error was HTTP
             fallback = {k: v for k, v in primary_params.items() if k != "ver"}
             try:
                 j = _get_json("GET", path, params=fallback, timeout=timeout)
@@ -168,9 +150,6 @@ def _collect_endpoint_rows(path: str, primary_params: Dict[str, Any], timeout: O
         return []
 
 def harvest_article_endpoints(article_row: dict, timeout: Optional[float]) -> Tuple[dict, dict]:
-    """
-    Harvest all article data endpoints for a single report row.
-    """
     def pick(row: dict, *names: str) -> Any:
         for n in names:
             if n in row:
@@ -201,7 +180,11 @@ def harvest_article_endpoints(article_row: dict, timeout: Optional[float]) -> Tu
     }
     return results, meta
 
-# ---------------- LCD data helpers ----------------
+# ---------- LCD harvesting ----------
+# We start by assuming all endpoints *might* be available; we will disable them
+# globally after we see the API’s "Hello MCIM API Users!" 400 for any one.
+_LCD_EP_SUPPORTED: Dict[str, Optional[bool]] = {}
+
 LCD_ENDPOINTS = [
     "/data/lcd/code-table",
     "/data/lcd/icd10-covered",
@@ -212,11 +195,61 @@ LCD_ENDPOINTS = [
     "/data/lcd/bill-codes",
 ]
 
+def _is_hello_400(err: Exception) -> bool:
+    s = str(err)
+    return " 400:" in s and _HELLO_MSG in s
+
+def _collect_lcd_rows_with_probe(path: str, primary_params: Dict[str, Any], timeout: Optional[float]) -> List[dict]:
+    # If we’ve already determined this endpoint is unsupported, skip fast.
+    if _LCD_EP_SUPPORTED.get(path) is False:
+        return []
+
+    short = _full_url(path)[len(BASE_URL):]
+    try:
+        j = _get_json("GET", path, params=primary_params, timeout=timeout)
+        meta = (j or {}).get("meta", {})
+        data = (j or {}).get("data", [])
+        if _LCD_EP_SUPPORTED.get(path) is None:
+            _LCD_EP_SUPPORTED[path] = True
+            print(f"[note] enabling LCD endpoint {short}")
+        print("[DEBUG]   page meta:", list(meta.keys()))
+        shown = ",".join(f"{k}={v}" for k, v in primary_params.items()) or "(no-params)"
+        print(f"[DEBUG]   -> {short} with {shown}: {len(data) if isinstance(data, list) else 0} rows")
+        return data if isinstance(data, list) else []
+    except RuntimeError as e:
+        if _is_hello_400(e):
+            if _LCD_EP_SUPPORTED.get(path) is not False:
+                _LCD_EP_SUPPORTED[path] = False
+                print(f"[note] disabling unsupported LCD endpoint {short} (API returned {_HELLO_MSG!r})")
+            return []
+        # If we provided a version, try unversioned before giving up.
+        if "ver" in primary_params:
+            fallback = {k: v for k, v in primary_params.items() if k != "ver"}
+            try:
+                j = _get_json("GET", path, params=fallback, timeout=timeout)
+                meta = (j or {}).get("meta", {})
+                data = (j or {}).get("data", [])
+                if _LCD_EP_SUPPORTED.get(path) is None:
+                    _LCD_EP_SUPPORTED[path] = True
+                    print(f"[note] enabling LCD endpoint {short}")
+                print("[DEBUG]   page meta:", list(meta.keys()))
+                shown = ",".join(f"{k}={v}" for k, v in fallback.items()) or "(no-params)"
+                print(f"[DEBUG]   -> {short} with {shown}: {len(data) if isinstance(data, list) else 0} rows")
+                return data if isinstance(data, list) else []
+            except RuntimeError as e2:
+                if _is_hello_400(e2):
+                    if _LCD_EP_SUPPORTED.get(path) is not False:
+                        _LCD_EP_SUPPORTED[path] = False
+                        print(f"[note] disabling unsupported LCD endpoint {short} (API returned {_HELLO_MSG!r})")
+                    return []
+                # other errors -> just print once for visibility
+                print(f"[DEBUG]   -> {path} error after fallback: {e2}")
+                return []
+        # other non-hello errors (e.g., 404/422/etc.)
+        print(f"[DEBUG]   -> {path} error: {e}")
+        return []
+
 def harvest_lcd_endpoints(lcd_row: dict, timeout: Optional[float]) -> Tuple[dict, dict]:
-    """
-    Harvest all LCD data endpoints for a single report row.
-    Uses lcdid (+ optional ver). The API rejects lcddisplayid on these endpoints.
-    """
     def pick(row: dict, *names: str) -> Any:
         for n in names:
             if n in row:
@@ -236,8 +269,9 @@ def harvest_lcd_endpoints(lcd_row: dict, timeout: Optional[float]) -> Tuple[dict
 
     params = {"lcdid": lid, **({"ver": ver} if ver else {})}
     results: Dict[str, List[dict]] = {}
+
     for ep in LCD_ENDPOINTS:
-        rows = _collect_endpoint_rows(ep, params, timeout=timeout)
+        rows = _collect_lcd_rows_with_probe(ep, params, timeout)
         results[ep] = rows
 
     meta = {
