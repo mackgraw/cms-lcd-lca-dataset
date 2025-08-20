@@ -1,7 +1,7 @@
 name: Coverage Harvest (Sharded, Daily 6am ET)
 
 on:
-  # Run at 10:00 and 11:00 UTC; ET guard below will only proceed when it's 06:00 in America/New_York
+  # We run at 10:00 and 11:00 UTC; an ET guard below only proceeds when it's 06:00 in America/New_York
   schedule:
     - cron: "0 10 * * *"
     - cron: "0 11 * * *"
@@ -23,6 +23,9 @@ on:
 env:
   PYTHONDONTWRITEBYTECODE: "1"
   PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+permissions:
+  contents: read
 
 jobs:
   # Gate so we truly run at 06:00 ET regardless of DST
@@ -46,7 +49,7 @@ jobs:
             echo "Skipping: Local ET hour is $now_et_hour (not 06)."
           fi
 
-  # Build the shard matrix from the workflow_dispatch input (or default 4)
+  # Build shard matrix from input (or default 4)
   compute_matrix:
     needs: [time_gate]
     if: needs.time_gate.outputs.run_now == 'true' || github.event_name == 'workflow_dispatch'
@@ -109,22 +112,40 @@ jobs:
         run: |
           set -euo pipefail
           echo "[env] SHARD_INDEX=${SHARD_INDEX} SHARD_TOTAL=${SHARD_TOTAL}"
+          # harvest_shard.py reads env vars; it writes:
+          # dataset/document_codes_shard_${SHARD_INDEX}_of_${SHARD_TOTAL}.csv
+          # dataset/document_nocodes_shard_${SHARD_INDEX}_of_${SHARD_TOTAL}.csv
           python -m scripts.harvest_shard
+          echo "[ls] dataset after shard ${SHARD_INDEX}"
+          ls -l dataset || true
 
-      - name: Collect shard outputs
+      - name: Verify shard produced outputs
+        shell: bash
         run: |
           set -euo pipefail
-          mkdir -p shard_out
-          # Each shard writes to dataset/document_*_shard_{i}_of_{n}.csv
-          cp -v dataset/document_*_shard_*_of_* . || true
-          mv -v document_*_shard_*_of_* shard_out/ || true
-          echo "[ls] shard_out"; ls -l shard_out || true
+          codes="dataset/document_codes_shard_${SHARD_INDEX}_of_${SHARD_TOTAL}.csv"
+          nocodes="dataset/document_nocodes_shard_${SHARD_INDEX}_of_${SHARD_TOTAL}.csv"
+          missing=0
+          for f in "$codes" "$nocodes"; do
+            if [ ! -s "$f" ]; then
+              echo "::error file=$f::Expected shard output not found for shard $SHARD_INDEX of $SHARD_TOTAL"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "Shard ${SHARD_INDEX}: required output files are missing"; exit 1
+          fi
+          echo "[ok] shard ${SHARD_INDEX} produced:"
+          ls -l "$codes" "$nocodes"
 
       - name: Upload shard artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: dataset-shards
-          path: shard_out/*
+          name: shard-${{ matrix.shard_index }}
+          path: |
+            dataset/document_codes_shard_${{ matrix.shard_index }}_of_${{ needs.compute_matrix.outputs.shard_total }}.csv
+            dataset/document_nocodes_shard_${{ matrix.shard_index }}_of_${{ needs.compute_matrix.outputs.shard_total }}.csv
+          if-no-files-found: error
 
   merge_and_release:
     needs: [harvest, compute_matrix, time_gate]
@@ -150,10 +171,9 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install -y gh
 
-      - name: Download shard artifacts
+      - name: Download ALL shard artifacts
         uses: actions/download-artifact@v4
         with:
-          name: dataset-shards
           path: artifacts
 
       - name: Merge shards -> dataset/document_*.csv
@@ -203,7 +223,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Writes dataset/codes_normalized.csv and dataset/codes_changes.csv
+          # This helper writes both dataset/codes_normalized.csv and dataset/codes_changes.csv
           python -m scripts.compute_changes dataset/document_codes.csv prev/codes_normalized.csv
           echo "[ls] dataset after compute_changes"; ls -l dataset
 
