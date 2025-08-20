@@ -1,7 +1,7 @@
 name: Coverage Harvest (Sharded, Daily 6am ET)
 
 on:
-  # We run at 10:00 and 11:00 UTC; an ET guard below only proceeds when it's 06:00 in America/New_York
+  # Run at 10:00 and 11:00 UTC; guard below only proceeds when it's 06:00 in America/New_York
   schedule:
     - cron: "0 10 * * *"
     - cron: "0 11 * * *"
@@ -118,7 +118,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Use GitHub expressions directly so we don't rely on shell env variables.
           codes="dataset/document_codes_shard_${{ matrix.shard_index }}_of_${{ needs.compute_matrix.outputs.shard_total }}.csv"
           nocodes="dataset/document_nocodes_shard_${{ matrix.shard_index }}_of_${{ needs.compute_matrix.outputs.shard_total }}.csv"
           missing=0
@@ -209,16 +208,84 @@ jobs:
           if gh release view --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release download --repo "$GITHUB_REPOSITORY" --pattern "codes_normalized.csv" --dir prev || true
           fi
+          # Create header-only baseline if nothing fetched
           if [ ! -s prev/codes_normalized.csv ]; then
             echo "doc_type,doc_id,code_system,code,description,coverage_flag" > prev/codes_normalized.csv
           fi
           echo "[ls] prev"; ls -l prev
 
-      - name: Compute normalized + changes
+      - name: Build codes_normalized.csv (inline, Article+LCD)
         shell: bash
         run: |
           set -euo pipefail
-          python -m scripts.compute_changes dataset/document_codes.csv prev/codes_normalized.csv
+          python - <<'PY'
+import csv, sys
+inp = "dataset/document_codes.csv"
+outp = "dataset/codes_normalized.csv"
+cols_out = ["doc_type","doc_id","code_system","code","description","coverage_flag"]
+with open(inp, newline="", encoding="utf-8") as fin, open(outp, "w", newline="", encoding="utf-8") as fout:
+    r = csv.DictReader(fin)
+    w = csv.DictWriter(fout, fieldnames=cols_out); w.writeheader()
+    for row in r:
+        doc_type = (row.get("document_type") or row.get("doc_type") or "").strip()
+        doc_id = (row.get("document_id") or row.get("doc_id") or row.get("article_id") or "").strip()
+        code_system = (row.get("code_system") or "").strip()
+        code = (row.get("code") or "").strip()
+        description = (row.get("description") or "").strip()
+        coverage_flag = (row.get("coverage_flag") or "").strip()
+        if not doc_id or not code:  # skip blanks
+            continue
+        w.writerow({
+            "doc_type": doc_type if doc_type in ("LCD","Article") else doc_type,
+            "doc_id": doc_id,
+            "code_system": code_system,
+            "code": code,
+            "description": description,
+            "coverage_flag": coverage_flag,
+        })
+print(f"[ok] wrote dataset/codes_normalized.csv")
+PY
+          echo "[ls] dataset after normalization"; ls -l dataset
+
+      - name: Build codes_changes.csv (inline diff vs prev)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+import csv, sys
+from pathlib import Path
+
+def read_rows(p):
+    rows=[]
+    with open(p, newline="", encoding="utf-8") as f:
+        r=csv.DictReader(f)
+        for row in r: rows.append(row)
+    return rows
+
+prev_p = Path("prev/codes_normalized.csv")
+curr_p = Path("dataset/codes_normalized.csv")
+
+prev = {(r["doc_type"], r["doc_id"], r["code_system"], r["code"]): (r.get("coverage_flag","") or "") for r in read_rows(prev_p)}
+curr = {(r["doc_type"], r["doc_id"], r["code_system"], r["code"]): (r.get("coverage_flag","") or "") for r in read_rows(curr_p)}
+
+keys = set(prev.keys()) | set(curr.keys())
+out_cols = ["change_type","doc_type","doc_id","code_system","code","prev_flag","curr_flag"]
+with open("dataset/codes_changes.csv","w",newline="",encoding="utf-8") as f:
+    w=csv.DictWriter(f, fieldnames=out_cols); w.writeheader()
+    for k in sorted(keys):
+        p = prev.get(k); c = curr.get(k)
+        if p is None and c is not None:
+            ct="Added"
+        elif p is not None and c is None:
+            ct="Removed"
+        elif p != c:
+            ct="FlagChanged"
+        else:
+            continue
+        dt, di, cs, code = k
+        w.writerow({"change_type":ct,"doc_type":dt,"doc_id":di,"code_system":cs,"code":code,"prev_flag":("" if p is None else p),"curr_flag":("" if c is None else c)})
+print("[ok] wrote dataset/codes_changes.csv")
+PY
           echo "[ls] dataset after compute_changes"; ls -l dataset
 
       - name: Sanity check expected files
