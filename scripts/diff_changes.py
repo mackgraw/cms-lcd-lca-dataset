@@ -1,21 +1,25 @@
 from __future__ import annotations
 from typing import Dict, Iterable, List, Tuple
 
-
-def _key(r: Dict[str, str]) -> Tuple[str, str, str]:
-    # Identify a unique code row: (article_id, code_system, code)
-    return (str(r.get("article_id", "")), str(r.get("code_system", "")), str(r.get("code", "")))
-
+def _key(r: Dict[str, str]) -> Tuple[str, str, str, str]:
+    # Unique row across both Article and LCD:
+    # (doc_type, doc_id, code_system, code)
+    return (
+        (r.get("doc_type") or "").strip(),
+        (r.get("doc_id") or "").strip(),
+        (r.get("code_system") or "").strip(),
+        (r.get("code") or "").strip(),
+    )
 
 def compute_code_changes(prev_rows: Iterable[Dict[str, str]], curr_rows: Iterable[Dict[str, str]]) -> List[Dict[str, str]]:
     """
-    Returns a list of change dicts with fields:
+    Returns list of change dicts with fields:
       - change_type: Added | Removed | FlagChanged
-      - article_id, code_system, code
+      - doc_type, doc_id, code_system, code
       - prev_flag, curr_flag
     """
-    prev_map: Dict[Tuple[str, str, str], Dict[str, str]] = {}
-    curr_map: Dict[Tuple[str, str, str], Dict[str, str]] = {}
+    prev_map: Dict[Tuple[str, str, str, str], Dict[str, str]] = {}
+    curr_map: Dict[Tuple[str, str, str, str], Dict[str, str]] = {}
 
     for r in prev_rows:
         prev_map[_key(r)] = r
@@ -30,7 +34,8 @@ def compute_code_changes(prev_rows: Iterable[Dict[str, str]], curr_rows: Iterabl
             changes.append(
                 {
                     "change_type": "Added",
-                    "article_id": curr.get("article_id", ""),
+                    "doc_type": curr.get("doc_type", ""),
+                    "doc_id": curr.get("doc_id", ""),
                     "code_system": curr.get("code_system", ""),
                     "code": curr.get("code", ""),
                     "prev_flag": "",
@@ -44,7 +49,8 @@ def compute_code_changes(prev_rows: Iterable[Dict[str, str]], curr_rows: Iterabl
                 changes.append(
                     {
                         "change_type": "FlagChanged",
-                        "article_id": curr.get("article_id", ""),
+                        "doc_type": curr.get("doc_type", ""),
+                        "doc_id": curr.get("doc_id", ""),
                         "code_system": curr.get("code_system", ""),
                         "code": curr.get("code", ""),
                         "prev_flag": pf,
@@ -58,7 +64,8 @@ def compute_code_changes(prev_rows: Iterable[Dict[str, str]], curr_rows: Iterabl
             changes.append(
                 {
                     "change_type": "Removed",
-                    "article_id": prev.get("article_id", ""),
+                    "doc_type": prev.get("doc_type", ""),
+                    "doc_id": prev.get("doc_id", ""),
                     "code_system": prev.get("code_system", ""),
                     "code": prev.get("code", ""),
                     "prev_flag": prev.get("coverage_flag", "") or "",
