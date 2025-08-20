@@ -1,196 +1,269 @@
 # scripts/coverage_api.py
-
 from __future__ import annotations
 
+import os
 import time
-from typing import Any, Dict, List, Optional
+import typing as t
+from dataclasses import dataclass, field
 
 import requests
+from requests import Response
 
+BASE_URL = "https://api.coverage.cms.gov"
+SESSION = requests.Session()
 
-_BASE = "https://api.coverage.cms.gov"
-_SESSION: Optional[requests.Session] = None
-_BEARER: Optional[str] = None
-_TOKEN_TS: Optional[float] = None
+# In-memory token cache (simple and CI-safe)
+@dataclass
+class LicenseToken:
+    token: t.Optional[str] = None
+    obtained_at: float = 0.0
+    ttl_seconds: int = 3600  # CMS says ~1 hour
 
-# The API says tokens last ~1 hour. Refresh a bit early to be safe.
-_TOKEN_TTL_SECONDS = 60 * 60
-_REFRESH_SKEW_SECONDS = 5 * 60  # refresh ~5 minutes early
+    def is_fresh(self) -> bool:
+        if not self.token:
+            return False
+        # refresh proactively at 55 minutes
+        return (time.time() - self.obtained_at) < (self.ttl_seconds - 300)
 
+TOKEN_CACHE = LicenseToken()
 
-# -----------------------------
-# Session & token management
-# -----------------------------
-def get_session() -> requests.Session:
-    """Return a memoized requests.Session with standard headers."""
-    global _SESSION
-    if _SESSION is None:
-        s = requests.Session()
-        adapter = requests.adapters.HTTPAdapter(max_retries=3)
-        s.mount("https://", adapter)
-        s.mount("http://", adapter)
-        s.headers.update(
-            {
-                "Accept": "application/json",
-                "User-Agent": "cms-lcd-lca-dataset/harvester",
-            }
-        )
-        _SESSION = s
-    return _SESSION
+# ---------- Utilities ----------
 
+def _short_err(msg: str, limit: int = 120) -> str:
+    """Trim server error messages for logs."""
+    msg = (msg or "").strip().replace("\n", " ")
+    return (msg[:limit] + ("…" if len(msg) > limit else ""))
 
-def _token_is_stale() -> bool:
-    """True if we should refresh the token due to age."""
-    if _TOKEN_TS is None:
-        return True
-    age = time.time() - _TOKEN_TS
-    return age >= (_TOKEN_TTL_SECONDS - _REFRESH_SKEW_SECONDS)
+def _full_url(path: str) -> str:
+    if path.startswith("http"):
+        return path
+    if not path.startswith("/"):
+        path = "/" + path
+    return BASE_URL + path
 
+def _headers() -> dict:
+    # Some endpoints may not require the token at all,
+    # but if we have one, include it in a conservative, non-breaking way.
+    # The API docs' exact header name is redacted in the notes text,
+    # so we *only* include it as Authorization if present.
+    if TOKEN_CACHE.token:
+        return {"Authorization": f"Bearer {TOKEN_CACHE.token}"}
+    return {}
 
-def ensure_license_acceptance(timeout: Optional[int] = None) -> Optional[str]:
-    """
-    Call /v1/metadata/license-agreement to acknowledge the license
-    and install the returned bearer token on the session.
-    Returns the token, or None if the endpoint didn’t return one.
-    """
-    global _BEARER, _TOKEN_TS
+def _request(method: str, path: str, *, params: dict | None = None, timeout: int | float | None = None) -> Response:
+    url = _full_url(path)
+    resp = SESSION.request(method=method, url=url, params=params or {}, headers=_headers(), timeout=timeout)
+    # If auth/token is required and we got rejected, try to refresh once and retry
+    if resp.status_code in (401, 403):
+        # refresh token then retry once
+        ensure_license_acceptance()
+        resp = SESSION.request(method=method, url=url, params=params or {}, headers=_headers(), timeout=timeout)
+    return resp
 
-    s = get_session()
-    url = f"{_BASE}/v1/metadata/license-agreement"
-    print(f"[DEBUG] GET {url} -> ...")
-    r = s.get(url, timeout=timeout or 30)
-
-    # Try to parse JSON even on error; log useful bits.
+def _get_json(method: str, path: str, *, params: dict | None = None, timeout: int | float | None = None) -> dict:
+    resp = _request(method, path, params=params, timeout=timeout)
     try:
-        payload = r.json()
+        data = resp.json()
     except Exception:
-        payload = {"meta": {"status": {"id": r.status_code, "message": r.reason}}, "data": []}
+        resp.raise_for_status()
+        # If not JSON and not an HTTP error, raise anyway
+        raise
 
-    status = payload.get("meta", {}).get("status", {})
-    code = status.get("id", r.status_code)
-    print(f"[DEBUG] GET {url} -> {code}; keys={list(payload.keys())}")
-    # full payload can be noisy, but printing here has helped debugging:
-    print(f"[DEBUG] GET {url} -> {payload}; keys={list(payload.keys())}")
+    # If the server embeds errors as JSON with 'message'
+    if resp.status_code >= 400:
+        message = data.get("message") if isinstance(data, dict) else None
+        raise RuntimeError(f"{resp.status_code} for {path}: {_short_err(str(message) if message else resp.text)}")
 
-    # Extract the token (if provided)
-    token = None
+    return data
+
+# ---------- Public API ----------
+
+def ensure_license_acceptance(timeout: int | float | None = None) -> None:
+    """
+    Call the metadata license endpoint. Cache the token (if one is returned)
+    and refresh it when stale. Safe to call as often as you like.
+    """
+    if TOKEN_CACHE.is_fresh():
+        return
+
+    j = _get_json("GET", "/v1/metadata/license-agreement", timeout=timeout)
+
+    # Common success shape from CMS:
+    # {
+    #   "meta": { "status": {"id": 200, "message": "OK"}, "notes": "...Please use this token as a ***..." , ... },
+    #   "data": [{"Token": "<uuid>"}]
+    # }
+    token_val = None
     try:
-        data = payload.get("data") or []
+        data = j.get("data") or []
         if data and isinstance(data, list) and isinstance(data[0], dict):
-            token = data[0].get("Token")
+            token_val = data[0].get("Token")
     except Exception:
-        token = None
+        token_val = None
 
-    if token:
-        _BEARER = token
-        _TOKEN_TS = time.time()
-        s.headers["Authorization"] = f"Bearer {token}"
-        masked = token[:8] + "..." + token[-4:] if len(token) > 12 else "***"
-        print(f"[note] CMS license token acquired and installed (Bearer {masked}).")
-    else:
-        print("[note] CMS license agreement acknowledged (no token provided).")
+    TOKEN_CACHE.token = token_val or TOKEN_CACHE.token
+    TOKEN_CACHE.obtained_at = time.time()
 
-    return token
-
-
-# -----------------------------
-# Low-level GET helpers
-# -----------------------------
-def _remap_short_params(p: Dict[str, Any]) -> Dict[str, Any]:
+def fetch_local_reports(
+    states: list[str] | None = None,
+    status: str | None = None,
+    contractors: list[str] | None = None,
+    timeout: int | float | None = None,
+) -> tuple[list[dict], list[dict]]:
     """
-    Optional convenience: map short names used in some call sites to API names.
-    Example: articleid -> article_id, ver -> document_version
+    Return (final_lcds, articles) from the 'reports' endpoints.
+    Filters are applied client-side (CMS reports endpoints don’t support all filters).
     """
-    if not p:
-        return p
-    p = dict(p)  # copy
-    # Short -> API
-    if "articleid" in p:
-        p["article_id"] = p.pop("articleid")
-    if "lcdid" in p:
-        p["lcd_id"] = p.pop("lcdid")
-    if "docid" in p:
-        p["document_id"] = p.pop("docid")
-    if "docdisplay" in p:
-        p["document_display_id"] = p.pop("docdisplay")
-    if "ver" in p:
-        p["document_version"] = p.pop("ver")
-    return p
+    ensure_license_acceptance(timeout=timeout)
 
+    # Pull both lists
+    lcds_json = _get_json("GET", "/v1/reports/local-coverage-final-lcds", timeout=timeout)
+    arts_json = _get_json("GET", "/v1/reports/local-coverage-articles", timeout=timeout)
 
-def _maybe_log_server_message(payload: Dict[str, Any]) -> None:
-    # Print the first 120 chars of an API-level "message", when present
-    msg = payload.get("message")
-    if msg is not None:
-        print(f"[DEBUG]   server message: {str(msg)[:120]}")
+    lcds = lcds_json.get("data", []) if isinstance(lcds_json, dict) else []
+    arts = arts_json.get("data", []) if isinstance(arts_json, dict) else []
 
+    # Optional client-side filters
+    def _match_states(row: dict) -> bool:
+        if not states:
+            return True
+        # common fields: 'contractor_name_type' often includes state info (e.g., "First Coast Service Options, Inc. (FL)")
+        s = (row.get("contractor_name_type") or "") + " " + (row.get("title") or "")
+        return any(st.strip().upper() in s.upper() for st in states)
 
-def _request_with_optional_refresh(
-    method: str, url: str, *, params: Optional[Dict[str, Any]], timeout: Optional[int]
-) -> requests.Response:
+    def _match_status(row: dict) -> bool:
+        if not status or status.lower() == "all":
+            return True
+        # reports endpoints typically don't include an explicit status for "final" lists;
+        # leave as True unless you later supplement with more metadata.
+        return True
+
+    def _match_contractors(row: dict) -> bool:
+        if not contractors:
+            return True
+        s = (row.get("contractor_name_type") or "")
+        return any(c.lower() in s.lower() for c in contractors)
+
+    lcds_f = [r for r in lcds if _match_states(r) and _match_status(r) and _match_contractors(r)]
+    arts_f = [r for r in arts if _match_states(r) and _match_status(r) and _match_contractors(r)]
+    return (lcds_f, arts_f)
+
+def _try_article_param_sets(article_id: t.Optional[int], article_display_id: t.Optional[str], document_version: t.Optional[int]) -> list[dict]:
     """
-    Make one request. If we get 401/403, refresh token and retry once.
-    Also refresh token if it's stale before we make the call.
+    The article 'data' endpoints accept different parameter names depending on the table.
+    From your logs, 'articleid' and 'ver' worked (but returned 0 rows on those examples).
+    We’ll try a small set of permutations.
     """
-    s = get_session()
+    params_sets: list[dict] = []
 
-    # Pre-emptive refresh if our token is stale/absent
-    if _token_is_stale():
+    aid = int(article_id) if (article_id is not None and str(article_id).isdigit()) else None
+    ver = int(document_version) if (document_version is not None and str(document_version).isdigit()) else None
+    disp = (article_display_id or "").strip() or None
+
+    # Highest-confidence combos first:
+    if aid and ver:
+        params_sets.append({"articleid": aid, "ver": ver})
+    if disp and ver:
+        params_sets.append({"articledisplayid": disp, "ver": ver})
+
+    # Looser (ID-only) fallbacks:
+    if aid:
+        params_sets.append({"articleid": aid})
+    if disp:
+        params_sets.append({"articledisplayid": disp})
+
+    # Final fallback: nothing (some endpoints allow paging everything, but we expect 0)
+    params_sets.append({})
+    return params_sets
+
+def _collect_article_endpoint_rows(path: str, param_sets: list[dict], timeout: int | float | None) -> list[dict]:
+    rows: list[dict] = []
+    for p in param_sets:
         try:
-            ensure_license_acceptance(timeout=timeout)
-        except Exception as e:
-            print(f"[warn] token refresh failed pre-request: {e!r}")
+            j = _get_json("GET", path, params=p, timeout=timeout)
+        except RuntimeError as e:
+            # Print concise server msg and continue
+            print(f"[DEBUG]   -> {path} with {','.join(f'{k}={v}' for k,v in p.items()) or '(no-params)'}: {e}")
+            continue
+        meta = (j or {}).get("meta", {})
+        data = (j or {}).get("data", [])
+        status = ((meta or {}).get("status") or {}).get("id")
+        notes = (meta or {}).get("notes")
+        fields = (meta or {}).get("fields")
+        children = (meta or {}).get("children")
+        print("[DEBUG]   page meta:", list(k for k in meta.keys()))
+        print(f"[DEBUG]   -> {_full_url(path)[len(BASE_URL):]} with "
+              f"{','.join(f'{k}={v}' for k,v in p.items()) or '(no-params)'}: {len(data)} rows")
+        if isinstance(data, list) and data:
+            rows.extend(data)
+        # stop early if we found something
+        if rows:
+            break
+    return rows
 
-    # First attempt
-    r = s.request(method, url, params=params or {}, timeout=timeout or 30)
+def get_article_codes(
+    *,
+    article_id: int | None = None,
+    article_display_id: str | None = None,
+    document_version: int | None = None,
+    timeout: int | float | None = None,
+) -> dict[str, list[dict]]:
+    """
+    Pull code tables for a single Article across the relevant endpoints.
+    Returns a dict { endpoint_name -> [rows] }
+    """
+    ensure_license_acceptance(timeout=timeout)
 
-    if r.status_code in (401, 403):
-        # Try a refresh and retry once
-        print(f"[DEBUG] {r.status_code} received; attempting token refresh and retry once.")
+    param_sets = _try_article_param_sets(article_id, article_display_id, document_version)
+
+    endpoints = {
+        "code-table": "/v1/data/article/code-table",
+        "icd10-covered": "/v1/data/article/icd10-covered",
+        "icd10-noncovered": "/v1/data/article/icd10-noncovered",
+        "hcpc-code": "/v1/data/article/hcpc-code",
+        "hcpc-modifier": "/v1/data/article/hcpc-modifier",
+        "revenue-code": "/v1/data/article/revenue-code",
+        "bill-codes": "/v1/data/article/bill-codes",
+    }
+
+    out: dict[str, list[dict]] = {}
+    for name, path in endpoints.items():
+        print(f"[DEBUG] GET {BASE_URL}{path} -> ...")
+        rows = _collect_article_endpoint_rows(path, param_sets, timeout)
+        out[name] = rows
+
+    return out
+
+# (Optional) Stub for LCD code pulls, if you wire it later.
+def get_lcd_codes(
+    *,
+    lcd_id: int | None = None,
+    lcd_display_id: str | None = None,
+    document_version: int | None = None,
+    timeout: int | float | None = None,
+) -> dict[str, list[dict]]:
+    """
+    Placeholder for LCD code pulls — add real LCD endpoints you plan to query.
+    Keeping the shape consistent with get_article_codes for drop-in use.
+    """
+    ensure_license_acceptance(timeout=timeout)
+
+    # Add the LCD endpoints you need, similar to the article ones.
+    endpoints = {
+        # Example (uncomment when you confirm):
+        # "hcpc-code": "/v1/data/lcd/hcpc-code",
+        # "icd10-covered": "/v1/data/lcd/icd10-covered",
+        # "icd10-noncovered": "/v1/data/lcd/icd10-noncovered",
+        # ...
+    }
+    out: dict[str, list[dict]] = {}
+    for name, path in endpoints.items():
+        print(f"[DEBUG] GET {BASE_URL}{path} -> ...")
+        # implement a _try_lcd_param_sets() if needed; for now, empty
         try:
-            ensure_license_acceptance(timeout=timeout)
-        except Exception as e:
-            print(f"[warn] token refresh failed after {r.status_code}: {e!r}")
-        r = s.request(method, url, params=params or {}, timeout=timeout or 30)
-
-    return r
-
-
-def api_get(path: str, params: Optional[Dict[str, Any]] = None, timeout: Optional[int] = None) -> Dict[str, Any]:
-    """
-    GET wrapper that uses the shared session, includes Bearer auth,
-    logs useful bits, and returns the parsed JSON.
-    Raises for non-2xx after logging message (if present).
-    """
-    url = f"{_BASE}{path}" if not path.startswith("http") else path
-    p = _remap_short_params(params or {})
-
-    print(f"[DEBUG] GET {url} -> ...")
-    r = _request_with_optional_refresh("GET", url, params=p, timeout=timeout)
-
-    # Try JSON; if not JSON, raise on HTTP error then return empty dict.
-    try:
-        payload = r.json()
-    except Exception:
-        r.raise_for_status()
-        return {}
-
-    # Log basics
-    meta = payload.get("meta", {})
-    status = meta.get("status", {})
-    code = status.get("id", r.status_code)
-    print(f"[DEBUG] GET {url} -> {code}; keys={list(payload.keys())}")
-    _maybe_log_server_message(payload)
-
-    # Raise if server says it's an error (e.g., 400) — caller may catch.
-    r.raise_for_status()
-    return payload
-
-
-def api_paginate(path: str, params: Optional[Dict[str, Any]] = None, timeout: Optional[int] = None) -> List[Dict[str, Any]]:
-    """
-    Simple paginator for endpoints that just return all rows in `data`.
-    (Most of the Coverage API's /v1/data/* endpoints behave this way.)
-    """
-    payload = api_get(path, params=params, timeout=timeout)
-    return list(payload.get("data") or [])
+            j = _get_json("GET", path, params={}, timeout=timeout)
+            out[name] = (j or {}).get("data", []) or []
+        except RuntimeError as e:
+            print(f"[DEBUG]   -> {path} error: {e}")
+            out[name] = []
+    return out
