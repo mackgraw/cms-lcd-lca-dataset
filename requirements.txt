@@ -4,4 +4,3 @@ python-dateutil>=2.9.0
 pydantic>=2.8.0
 tenacity>=8.2.2
 pyyaml
-pyyaml
