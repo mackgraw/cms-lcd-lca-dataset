@@ -15,6 +15,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Define package include list
+        run: |
+          echo 'PACKAGE_INCLUDE=README.md DATA_DICTIONARY.md CHANGELOG.md SAMPLE dataset/*.csv' >> $GITHUB_ENV
+
+
       - name: Set env
         run: |
           echo "TAG=${GITHUB_REF_NAME:-manual-$(date +'%Y%m%d')}" >> $GITHUB_ENV
