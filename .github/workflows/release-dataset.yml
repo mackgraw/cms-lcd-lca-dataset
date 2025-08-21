@@ -1,0 +1,90 @@
+name: Release dataset (zip only whitelisted paths)
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history for changelog)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set env
+        run: |
+          echo "TAG=${GITHUB_REF_NAME:-manual-$(date +'%Y%m%d')}" >> $GITHUB_ENV
+          echo "DATESTAMP=$(date +'%Y%m%d')" >> $GITHUB_ENV
+
+      - name: Python for sample script
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install minimal deps
+        run: python -c "print('ok')"  # no deps required; using stdlib csv
+
+      - name: Generate SAMPLE dataset
+        run: |
+          python scripts/make_samples.py
+        env:
+          DATASET_DIR: dataset
+          SAMPLE_DIR: SAMPLE
+          SAMPLE_ROWS: "200"
+
+      - name: Generate CHANGELOG.md
+        run: scripts/make_changelog.sh
+
+      - name: Prepare dist
+        run: mkdir -p dist
+
+      # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+      # EDIT THIS BLOCK to control what goes in the ZIP:
+      # Add/remove paths in PACKAGE_INCLUDE (space-separated globs).
+      - name: Define package include list
+        id: include
+        run: |
+          echo 'PACKAGE_INCLUDE=README.md DATA_DICTIONARY.md CHANGELOG.md SAMPLE dataset/*.csv' >> $GITHUB_ENV
+      # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+      - name: Build ZIP (only includes listed paths)
+        run: |
+          ZIPNAME="cms-lcd-${TAG}.zip"
+          echo "Creating dist/${ZIPNAME}"
+          # create a staging dir to keep a clean internal folder
+          mkdir -p "staging/cms-lcd-${TAG}"
+          for ITEM in $PACKAGE_INCLUDE; do
+            # use rsync-like behavior via cp --parents where possible
+            for MATCH in $ITEM; do
+              # ensure glob expansion even if no match (fail early)
+              if compgen -G "$MATCH" > /dev/null; then
+                cp --parents -r $MATCH "staging/cms-lcd-${TAG}/"
+              else
+                echo "::warning::No matches for pattern '$MATCH'"
+              fi
+            done
+          done
+          (cd staging && zip -r "../dist/${ZIPNAME}" "cms-lcd-${TAG}")
+          echo "ZIP_PATH=dist/${ZIPNAME}" >> $GITHUB_ENV
+
+      - name: Upload artifact (CI)
+        uses: actions/upload-artifact@v4
+        with:
+          name: cms-lcd-${{ env.TAG }}
+          path: ${{ env.ZIP_PATH }}
+
+      - name: Create GitHub Release & attach ZIP
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          name: "CMS LCD ${{ env.TAG }}"
+          body: |
+            Automated release for ${{ env.TAG }}.
+            See CHANGELOG.md inside the ZIP for details.
+          files: ${{ env.ZIP_PATH }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
