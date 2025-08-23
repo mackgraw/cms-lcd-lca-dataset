@@ -2,8 +2,7 @@ name: Release dataset (zip only whitelisted paths)
 
 on:
   push:
-    tags:
-      - "v*"
+    tags: ["v*"]
   workflow_dispatch:
 
 jobs:
@@ -12,69 +11,61 @@ jobs:
     steps:
       - name: Checkout (full history for changelog)
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Define package include list
-        run: |
-          echo 'PACKAGE_INCLUDE=README.md DATA_DICTIONARY.md CHANGELOG.md SAMPLE dataset/*.csv' >> $GITHUB_ENV
-
+        with: { fetch-depth: 0 }
 
       - name: Set env
         run: |
           echo "TAG=${GITHUB_REF_NAME:-manual-$(date +'%Y%m%d')}" >> $GITHUB_ENV
           echo "DATESTAMP=$(date +'%Y%m%d')" >> $GITHUB_ENV
 
-      - name: Python for sample script
-        uses: actions/setup-python@v5
+      - name: Download latest harvest artifacts (if available)
+        uses: dawidd6/action-download-artifact@v6
         with:
-          python-version: "3.11"
+          workflow: coverage-harvest.sharded.yml
+          workflow_conclusion: success
+          branch: main
+          name: dataset_artifact
+          path: dataset
+        continue-on-error: true
 
-      - name: Install minimal deps
-        run: python -c "print('ok')"  # no deps required; using stdlib csv
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
 
       - name: Generate SAMPLE dataset
-        run: |
-          python scripts/make_samples.py
+        run: python scripts/make_samples.py
         env:
           DATASET_DIR: dataset
           SAMPLE_DIR: SAMPLE
           SAMPLE_ROWS: "200"
 
       - name: Generate CHANGELOG.md
-        run: scripts/make_changelog.sh
+        run: bash scripts/make_changelog.sh
 
       - name: Prepare dist
         run: mkdir -p dist
 
-      # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-      # EDIT THIS BLOCK to control what goes in the ZIP:
-      # Add/remove paths in PACKAGE_INCLUDE (space-separated globs).
+      # 👇 Edit this list to control what goes into the ZIP
       - name: Define package include list
-        id: include
         run: |
           echo 'PACKAGE_INCLUDE=README.md DATA_DICTIONARY.md CHANGELOG.md SAMPLE dataset/*.csv' >> $GITHUB_ENV
-      # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
       - name: Build ZIP (only includes listed paths)
         run: |
+          set -euo pipefail
           ZIPNAME="cms-lcd-${TAG}.zip"
           echo "Creating dist/${ZIPNAME}"
-          # create a staging dir to keep a clean internal folder
           mkdir -p "staging/cms-lcd-${TAG}"
           for ITEM in $PACKAGE_INCLUDE; do
-            # use rsync-like behavior via cp --parents where possible
-            for MATCH in $ITEM; do
-              # ensure glob expansion even if no match (fail early)
-              if compgen -G "$MATCH" > /dev/null; then
-                cp --parents -r $MATCH "staging/cms-lcd-${TAG}/"
-              else
-                echo "::warning::No matches for pattern '$MATCH'"
-              fi
-            done
+            if compgen -G "$ITEM" > /dev/null; then
+              cp --parents -r $ITEM "staging/cms-lcd-${TAG}/"
+            else
+              echo "::warning::No matches for pattern '$ITEM'"
+            fi
           done
           (cd staging && zip -r "../dist/${ZIPNAME}" "cms-lcd-${TAG}")
           echo "ZIP_PATH=dist/${ZIPNAME}" >> $GITHUB_ENV
+          unzip -l "dist/${ZIPNAME}" | sed -n '1,30p'
 
       - name: Upload artifact (CI)
         uses: actions/upload-artifact@v4
@@ -89,7 +80,7 @@ jobs:
           name: "CMS LCD ${{ env.TAG }}"
           body: |
             Automated release for ${{ env.TAG }}.
-            See CHANGELOG.md inside the ZIP for details.
+            Contents: README.md, DATA_DICTIONARY.md, CHANGELOG.md, SAMPLE/, dataset/*.csv
           files: ${{ env.ZIP_PATH }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
