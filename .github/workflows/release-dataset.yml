@@ -1,24 +1,55 @@
-name: Release dataset (zip only whitelisted paths)
+name: Release dataset (curated ZIP)
 
 on:
   push:
-    tags: ["v*"]
-  workflow_dispatch:
+    tags: ["v*"]                 # manual/semver releases
+  workflow_dispatch:             # manual button
+  workflow_run:                  # auto-nightly after harvest
+    workflows: ["Coverage Harvest (sharded, artifacts-only)"]
+    types: [completed]
+
+permissions:
+  contents: write
 
 jobs:
   build-and-release:
+    # Run on tag push, manual dispatch, or after a successful harvest run
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout (full history for changelog)
         uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
+        with:
+          fetch-depth: 0
 
-      - name: Set env
+      - name: Set TAG and flags
+        id: tag
         run: |
-          echo "TAG=${GITHUB_REF_NAME:-manual-$(date +'%Y%m%d')}" >> $GITHUB_ENV
-          echo "DATESTAMP=$(date +'%Y%m%d')" >> $GITHUB_ENV
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_run" ]]; then
+            # Auto-nightly tag (UTC)
+            TAG="nightly-$(date -u +%Y%m%d-%H%M)"
+            PRERELEASE="true"
+          else
+            TAG="${GITHUB_REF_NAME:-manual-$(date -u +%Y%m%d)}"
+            PRERELEASE="false"
+          fi
+          echo "TAG=$TAG"           >> $GITHUB_ENV
+          echo "PRERELEASE=$PRERELEASE" >> $GITHUB_ENV
+          echo "Using TAG=$TAG (prerelease=$PRERELEASE)"
 
+      # Prefer the artifacts from the *specific* harvest run when triggered by workflow_run
+      - name: Download artifacts from triggering harvest run
+        if: ${{ github.event_name == 'workflow_run' }}
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          run_id: ${{ github.event.workflow_run.id }}
+          name: dataset_artifact
+          path: dataset
+
+      # Fallback: when triggered by tag or manual, pull the latest successful artifacts
       - name: Download latest harvest artifacts (if available)
+        if: ${{ github.event_name != 'workflow_run' }}
         uses: dawidd6/action-download-artifact@v6
         with:
           workflow: coverage-harvest.sharded.yml
@@ -30,7 +61,8 @@ jobs:
 
       - name: Setup Python
         uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
+        with:
+          python-version: "3.11"
 
       - name: Generate SAMPLE dataset
         run: python scripts/make_samples.py
@@ -45,7 +77,6 @@ jobs:
       - name: Prepare dist
         run: mkdir -p dist
 
-      # 👇 Edit this list to control what goes into the ZIP
       - name: Define package include list
         run: |
           echo 'PACKAGE_INCLUDE=README.md DATA_DICTIONARY.md CHANGELOG.md SAMPLE dataset/*.csv' >> $GITHUB_ENV
@@ -76,11 +107,12 @@ jobs:
       - name: Create GitHub Release & attach ZIP
         uses: softprops/action-gh-release@v2
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           tag_name: ${{ env.TAG }}
+          target_commitish: ${{ github.sha }}
           name: "CMS LCD ${{ env.TAG }}"
+          prerelease: ${{ env.PRERELEASE }}
           body: |
             Automated release for ${{ env.TAG }}.
             Contents: README.md, DATA_DICTIONARY.md, CHANGELOG.md, SAMPLE/, dataset/*.csv
           files: ${{ env.ZIP_PATH }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
