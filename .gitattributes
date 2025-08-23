@@ -1,7 +1,7 @@
-# Do NOT export these when using `git archive`
 .github/            export-ignore
 scripts/            export-ignore
-src/                export-ignore
+tools/              export-ignore
 tests/              export-ignore
 venv/               export-ignore
+.venv/              export-ignore
 *.ipynb             export-ignore

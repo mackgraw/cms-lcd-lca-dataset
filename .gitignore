@@ -1,10 +1,37 @@
+# Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.build/
+dist/
+
+# Virtual envs
 .venv/
-.env
-data/
-artifacts/
-*.zip
+venv/
+env/
+
+# IDE/editor
+.vscode/
+.idea/
+*.code-workspace
+
+# OS
 .DS_Store
 Thumbs.db
-$GITHUB_ENV
+
+# Logs/cache/temp
+.harvest_logs/
+logs/
+tmp/
+.cache/
+*.log
+
+# Data artifacts (kept out of repo; produced by CI)
+dataset/*.csv
+dataset/*.parquet
+dataset.zip
+
+# Node (if any)
+node_modules/
