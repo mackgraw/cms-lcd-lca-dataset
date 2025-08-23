@@ -5,31 +5,43 @@ on:
   schedule:
     - cron: "0 6 * * *" # optional daily run
 
+concurrency:
+  group: coverage-harvest
+  cancel-in-progress: true
+
 jobs:
   harvest:
     name: harvest shard ${{ matrix.shard }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix: { shard: [0,1,2,3] }  # adjust count as needed
+      matrix: { shard: [0, 1, 2, 3] }  # adjust count as needed
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup Python
         uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
+        with:
+          python-version: "3.11"
 
       - name: Install deps
         run: |
           python -m pip install -U pip
           [[ -f requirements.txt ]] && pip install -r requirements.txt || echo "no requirements.txt"
 
-      - name: Run shard (entrypoint handles real harvester or fallback)
+      - name: Run shard (smart entrypoint prefers harvest_shard.py)
         env:
           SHARD_INDEX: ${{ matrix.shard }}
           SHARD_COUNT: 4
+          # Optional filters (set in Repo Settings → Variables if you want to use them)
+          COVERAGE_MAX_DOCS: ${{ vars.COVERAGE_MAX_DOCS }}
+          COVERAGE_STATUS: ${{ vars.COVERAGE_STATUS }}
+          COVERAGE_STATES: ${{ vars.COVERAGE_STATES }}
+          COVERAGE_CONTRACTORS: ${{ vars.COVERAGE_CONTRACTORS }}
+          COVERAGE_TIMEOUT: 60
         run: |
           bash scripts/harvest_entrypoint.sh shard_out
+          ls -l shard_out || true
 
       - name: Upload shard artifact
         uses: actions/upload-artifact@v4
@@ -47,16 +59,18 @@ jobs:
 
       - name: Download all shard artifacts
         uses: actions/download-artifact@v4
-        with: { path: shards_in }
+        with:
+          path: shards_in
 
       - name: Setup Python
         uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
+        with:
+          python-version: "3.11"
 
-      - name: Merge shards to dataset/*.csv
+      - name: Combine shard CSVs -> dataset/*.csv
         run: |
           mkdir -p dataset
-          python scripts/merge_shards.py --in shards_in --out dataset
+          python scripts/combine_sharded_outputs.py --in shards_in --out dataset
 
       - name: List dataset
         run: ls -lah dataset || true
@@ -71,6 +85,7 @@ jobs:
       - name: (Optional) Upload zipped dataset for inspection
         if: ${{ hashFiles('dataset/*.csv') != '' }}
         run: zip -r dataset.zip dataset
+
       - name: Upload zipped dataset (inspection only)
         if: ${{ hashFiles('dataset/*.csv') != '' }}
         uses: actions/upload-artifact@v4
