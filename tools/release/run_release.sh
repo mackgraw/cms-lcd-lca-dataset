@@ -1,0 +1,91 @@
+name: Release dataset (zip only whitelisted paths)
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+# ✅ Give the Actions token write access so it can create Releases
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history for changelog)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set env
+        run: |
+          echo "TAG=${GITHUB_REF_NAME:-manual-$(date +'%Y%m%d')}" >> $GITHUB_ENV
+          echo "DATESTAMP=$(date +'%Y%m%d')" >> $GITHUB_ENV
+
+      - name: Download latest harvest artifacts (if available)
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: coverage-harvest.sharded.yml
+          workflow_conclusion: success
+          branch: main
+          name: dataset_artifact
+          path: dataset
+        continue-on-error: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Generate SAMPLE dataset
+        run: python scripts/make_samples.py
+        env:
+          DATASET_DIR: dataset
+          SAMPLE_DIR: SAMPLE
+          SAMPLE_ROWS: "200"
+
+      - name: Generate CHANGELOG.md
+        run: bash scripts/make_changelog.sh
+
+      - name: Prepare dist
+        run: mkdir -p dist
+
+      # 👇 Edit this to control exactly what's inside the ZIP
+      - name: Define package include list
+        run: |
+          echo 'PACKAGE_INCLUDE=README.md DATA_DICTIONARY.md CHANGELOG.md SAMPLE dataset/*.csv' >> $GITHUB_ENV
+
+      - name: Build ZIP (only includes listed paths)
+        run: |
+          set -euo pipefail
+          ZIPNAME="cms-lcd-${TAG}.zip"
+          echo "Creating dist/${ZIPNAME}"
+          mkdir -p "staging/cms-lcd-${TAG}"
+          for ITEM in $PACKAGE_INCLUDE; do
+            if compgen -G "$ITEM" > /dev/null; then
+              cp --parents -r $ITEM "staging/cms-lcd-${TAG}/"
+            else
+              echo "::warning::No matches for pattern '$ITEM'"
+            fi
+          done
+          (cd staging && zip -r "../dist/${ZIPNAME}" "cms-lcd-${TAG}")
+          echo "ZIP_PATH=dist/${ZIPNAME}" >> $GITHUB_ENV
+          unzip -l "dist/${ZIPNAME}" | sed -n '1,30p'
+
+      - name: Upload artifact (CI)
+        uses: actions/upload-artifact@v4
+        with:
+          name: cms-lcd-${{ env.TAG }}
+          path: ${{ env.ZIP_PATH }}
+
+      - name: Create GitHub Release & attach ZIP
+        uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}   # ✅ pass token explicitly
+          tag_name: ${{ env.TAG }}
+          name: "CMS LCD ${{ env.TAG }}"
+          body: |
+            Automated release for ${{ env.TAG }}.
+            Contents: README.md, DATA_DICTIONARY.md, CHANGELOG.md, SAMPLE/, dataset/*.csv
+          files: ${{ env.ZIP_PATH }}

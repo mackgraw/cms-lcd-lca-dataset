@@ -1,29 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 # Usage:
-#   tools/git/merge-to-main.sh [branch]   # default: current branch
+#   tools/git/merge-to-main.sh <branch>
+#
+# Merges the given branch into main with a merge commit and pushes.
 
-feature="${1:-$(git rev-parse --abbrev-ref HEAD)}"
-if [[ -z "${feature}" || "${feature}" == "HEAD" ]]; then
-  echo "Error: not on a branch; specify a branch explicitly."; exit 2
+branch="${1:-}"
+if [[ -z "$branch" ]]; then
+  echo "Usage: $0 <branch>" >&2
+  exit 2
 fi
 
-# Ensure working tree is clean
-if ! git diff --quiet || ! git diff --cached --quiet; then
-  echo "Error: uncommitted changes present. Commit or stash first."; exit 2
-fi
-
-# Push feature branch first
-git push origin "${feature}"
-
-# Fast-forward main, merge, and push
+git fetch origin
 git checkout main
-git pull origin main
-git merge --no-ff --no-edit "${feature}"   # <-- auto-accept default message
+git pull --ff-only origin main
+git merge --no-ff "$branch" -m "merge($branch): merge into main"
 git push origin main
-
-# Optional: delete feature branch locally and remotely
-git branch -d "${feature}" || true
-git push origin ":${feature}" || true
-
-echo "[ok] Merged ${feature} -> main (auto commit message used)"
+echo "Merged $branch into main."
