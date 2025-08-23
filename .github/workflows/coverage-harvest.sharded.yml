@@ -6,16 +6,19 @@ on:
     - cron: "0 6 * * *" # optional daily run
 
 concurrency:
-  group: coverage-harvest
+  group: coverage-harvest-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   harvest:
     name: harvest shard ${{ matrix.shard }}
     runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: ${{ github.workspace }}
     strategy:
       fail-fast: false
-      matrix: { shard: [0, 1, 2, 3] }  # adjust count as needed
+      max-parallel: 4
+      matrix: { shard: [0, 1, 2, 3] }  # adjust shard count as needed
     steps:
       - uses: actions/checkout@v4
 
@@ -29,11 +32,11 @@ jobs:
           python -m pip install -U pip
           [[ -f requirements.txt ]] && pip install -r requirements.txt || echo "no requirements.txt"
 
-      - name: Run shard (smart entrypoint prefers harvest_shard.py)
+      - name: Run shard (smart entrypoint)
         env:
           SHARD_INDEX: ${{ matrix.shard }}
-          SHARD_COUNT: 4
-          # Optional filters (set in Repo Settings → Variables if you want to use them)
+          SHARD_COUNT: 4         # keep for legacy; entrypoint maps this…
+          SHARD_TOTAL: 4         # …but set SHARD_TOTAL explicitly for your harvester
           COVERAGE_MAX_DOCS: ${{ vars.COVERAGE_MAX_DOCS }}
           COVERAGE_STATUS: ${{ vars.COVERAGE_STATUS }}
           COVERAGE_STATES: ${{ vars.COVERAGE_STATES }}
